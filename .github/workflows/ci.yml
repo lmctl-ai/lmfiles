@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
   test:
@@ -60,9 +60,38 @@ jobs:
         run: timeout 2400 bash scripts/build-native.sh
       - name: Native local gate
         run: timeout 1800 bash test.sh --native
+      - name: Name the tested executable per platform
+        run: |
+          mkdir -p dist
+          exe=target/lmfiles
+          suffix=
+          if [ -f target/lmfiles.exe ]; then exe=target/lmfiles.exe; suffix=.exe; fi
+          test -f "$exe"
+          cp "$exe" "dist/lmfiles-${{ matrix.name }}$suffix"
       - name: Upload tested executable
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: lmfiles-${{ matrix.name }}
-          path: target/lmfiles*
+          path: dist/*
           if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish the five tested binaries
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd dist
+          test "$(find . -maxdepth 1 -type f -name 'lmfiles-*' | wc -l)" -eq 5
+          sha256sum lmfiles-* > SHA256SUMS
+          timeout 180 gh release create "$GITHUB_REF_NAME" lmfiles-* SHA256SUMS --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --notes 'One native executable per platform; Java is not required. Local-only file lifecycle registry (no network access). Linux requires glibc 2.35 or newer.'
