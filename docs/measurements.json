@@ -24,10 +24,11 @@
   "max_rss_kib": 72684,
   "core_assertions": 55,
   "journal_assertions": 13,
-  "process_checks": 17,
+  "process_checks": 18,
   "fault_points": 9,
   "gallery_jobs": 6,
   "publication_scenarios": 6,
   "public_readme_urls_verified": 6,
-  "real_cloud_requests": 0
+  "real_cloud_requests": 0,
+  "note": "Benchmark artifact/source is the recorded 45d4324 measurement; follow-up gate adds deterministic lock termination and cache accounting."
 }

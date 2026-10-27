@@ -83,6 +83,23 @@ fi
 grep -q 'LMFILES_MAX_MEMORY_MB' "$fixture/memory.err"
 grep -q 'false' "$fixture/memory.json"
 
+# Per-store caches must also consume the same VM budget.
+python3 - "$fixture" <<'PYCACHES'
+import json,sys
+from pathlib import Path
+work=Path(sys.argv[1]);schema=(Path.cwd()/'schema/lmfiles.dsl.json').as_posix()
+program='let p = _lmcode_ schema='+json.dumps(schema)+';\n'
+for name in ['a','b']:
+ program+='let '+name+' = registry.open('+json.dumps((work/(name+'.mv')).as_posix())+',"budget","{\\\"cache_mb\\\":1}");\n'
+program+='end _lmcode_\nsavedsl(p,'+json.dumps((work/'caches.dslb').as_posix())+');\n'
+(work/'caches.lms').write_text(program,encoding='utf-8')
+PYCACHES
+run 30 lmscript "$fixture/caches.lms"
+if LMFILES_MAX_MEMORY_MB=2 "${host[@]}" --dsl "$fixture/caches.dslb" >"$fixture/caches.json" 2>"$fixture/caches.err"; then
+ echo 'store caches escaped the VM memory budget' >&2; exit 1
+fi
+grep -q 'LMFILES_MAX_MEMORY_MB' "$fixture/caches.err"
+
 if (( native == 1 )) && [[ "$(uname -s)" == Linux ]]; then
   (ulimit -v 6291456; run 120 "${host[@]}" --self-test "$fixture/address-space")
 fi

@@ -32,7 +32,8 @@ retention histories can change bytes/item; no compressed-store bound is promised
 ## Gate results
 
 Both managed and native gates pass55 independent semantic assertions,13 journal
-assertions, and17 process checks. The native semantic suite repeats under a6GiB
+assertions, and18 process checks (the follow-up lock test also verifies recovery after
+explicitly terminating its owner). Multiple opened-store caches also consume the VM budget. The native semantic suite repeats under a6GiB
 virtual-address limit. A growing standard-list DSL program fails at1MiB with the
 LMFILES_MAX_MEMORY_MB diagnostic; invalid budget configuration also fails.
 

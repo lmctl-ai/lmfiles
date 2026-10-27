@@ -72,7 +72,8 @@ db.close();
 
 `LMFILES_MAX_MEMORY_MB` is a positive whole number of MiB (default 256).
 VM allocations and bounded host records/pages/batches enforce this budget;
-MVStore cache defaults to 8 MiB and cannot exceed half the configured budget.
+MVStore cache defaults to 8 MiB, is charged to the VM on each open, and cannot
+exceed half the configured budget.
 The JVM managed launcher also caps its heap. Native images reserve 4 GiB address
 space with a 3 GiB runtime heap ceiling; the gate exercises the host under a
 6 GiB virtual-address limit. The budget is an application allocation bound, not

@@ -23,15 +23,22 @@ public final class DslHost implements AutoCloseable {
   }
   private static String str(Value v){return v.asString().toString();}
   private static int integer(Value v){long n=v.asInt();if(n<0||n>Integer.MAX_VALUE)throw VmException.host("integer out of range");return (int)n;}
+  private Value open(Context ctx,Value[] args){
+    long cache=Long.parseLong(J.text(J.obj(str(args[2])),"cache_mb","8"));
+    if(cache<1||cache>64)throw VmException.host("cache_mb must be 1..64");
+    ctx.charge(cache*1024L*1024+65536);
+    Store store=new Store(Path.of(str(args[0])),str(args[1]),str(args[2]));stores.add(store);
+    return Value.object("Registry",store);
+  }
   private Value call(HostApi.Binding b,Context ctx,Value self,Value[] a)throws Exception{
-    if(b.type()==null){Store s=new Store(Path.of(str(a[0])),str(a[1]),str(a[2]));stores.add(s);return Value.object("Registry",s);}
+    if(b.type()==null){return open(ctx,a);}
     String n=b.name();
     if(b.type().equals("Registry")){
       if(n.equals("log_append"))return Value.ofString(PlanLog.append(Path.of(str(a[0])),str(a[1]),str(a[2])));
       if(n.equals("instruction_digest"))return Value.ofString(PlanLog.instructionDigest(J.obj(str(a[0]))));
       if(n.equals("unconfirmed"))return Value.ofString(PlanLog.unconfirmed(Path.of(str(a[0])),Path.of(str(a[1])),Path.of(str(a[2]))));
       if(n.equals("apply_records"))return Value.ofString(PlanLog.apply((Store)self.asObject(),Path.of(str(a[0])),Path.of(str(a[1]))));
-      if(n.equals("open")){Store s=new Store(Path.of(str(a[0])),str(a[1]),str(a[2]));stores.add(s);return Value.object("Registry",s);}Store s=(Store)self.asObject();return switch(n){
+      if(n.equals("open")){return open(ctx,a);}Store s=(Store)self.asObject();return switch(n){
       case "close"-> {s.close();stores.remove(s);yield Value.none();}
       case "item_upsert","alias_add","alias_remove","observe","stage_record","stage_forget","item_tombstone","difference_index","renew","release","complete","doctor","export_records"->Value.ofString(s.call(n,vals(a)));
       case "query_subset","stage_difference"->Value.object("Cursor",s.query(n,vals(a)));

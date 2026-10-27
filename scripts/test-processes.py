@@ -17,6 +17,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import traceback
 
 
 def run(cmd: list[str], *, env: dict[str, str] | None = None, check: bool = True,
@@ -128,7 +129,7 @@ def main() -> int:
         # --hold-lock is an intentional test-only CLI operation. It keeps the
         # same Store open, proving the OS lock rather than racing a short request.
         holder_db = root / "lock.mv"
-        holder = subprocess.Popen(base + ["--hold-lock", str(holder_db), "1500"],
+        holder = subprocess.Popen(base + ["--hold-lock", str(holder_db), "30000"],
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         try:
             assert holder.stdout is not None
@@ -139,7 +140,10 @@ def main() -> int:
             assert busy.returncode != 0 and ("writer-busy" in busy.stderr or "lock" in busy.stderr), busy.stderr
             passed += 1
         finally:
+            if holder.poll() is None:holder.terminate()
             holder.wait(timeout=5)
+        assert json.loads(call("--request",str(holder_db),"doctor").stdout)["status"]=="ok"
+        passed+=1
 
         # Network denial is optional evidence: strace is unavailable on macOS
         # and Windows. Never claim this check passed when the tracer is absent.
@@ -161,6 +165,7 @@ def main() -> int:
         return 0
     except (AssertionError, OSError, subprocess.SubprocessError, json.JSONDecodeError) as exc:
         print(f"lmfiles process check failed: {exc}", file=sys.stderr)
+        traceback.print_exc()
         return 1
     finally:
         if ns.keep:
