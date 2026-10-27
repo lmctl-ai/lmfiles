@@ -1,18 +1,19 @@
-# 1C and limits
+# Remaining scope and limits
 
-Do not claim 100M/1B scale, five-platform execution or the750–1050B lean target
-from the local10k benchmark. Current comparable JVM codec measurement:1,473.3312 B/item at10k items (format1 baseline1,508.5568); it favors explicit
-correctness; custom raw-digest/delta layout awaits measured tier qualification.
+1C-a adds real loopback lmcurl/lmssh jobs, optional local scan and format3 compact
+events. The10k fixture meets the lean target (804.4544B/item); it does not qualify
+100M/1B items or metadata-heavy profiles. See docs/MEASUREMENTS.md.
 
-1C: optional local scan/hash helpers, general attribute/hash/time/aggregate
-indexes, change-cursor/checkpoint/archive APIs, multi-process mailbox, full tier
-benchmarks and broader portable path I/O. Non-UTF8 aliases round-trip in journals;
-Java local file I/O does not silently adopt unsupported raw-byte paths.
+Remaining1C: general attribute/hash/time/aggregate indexes, change cursors,
+checkpoints/event archives, coarse multi-process mailbox, packed item/raw-digest
+and alias layouts if justified, fixed-memory100M scale qualification, broader raw
+POSIX path I/O. Scanning does not infer deletion or safely skip directory contents
+from directory mtime alone. Stat-preserving writers need always_hash.
 
-Existing action-host additions from the design (large raw HTTP sink, persistent
-checksum-verified S3 file PUT/HEAD/invalidation, structured lmssh receipts) remain
-outside1A/1B. Re-audit their current APIs before adding anything. Core stays local.
+No live cloud or real remote test is authorized here. S3 stays a deterministic
+local executor. SFTP examples require installed sshd on Linux and strict temporary
+known_hosts. Native macOS/Windows need later qualification of the new code.
 
-v0.1.0 is released; v0.1.1 awaits the Lead’s release. No real cloud/SSH test
-is authorized by this patch. Alias families and equal-success elision are now
-implemented with format2; compact raw-digest/event codecs remain1C.
+SDK JSON numbers use Double: use decimal strings for64bit metadata. SDK cache
+arena credits on close and PlanLog.unconfirmed per-line fsync optimization remain
+review lows11/12; no guarantees were weakened. Lead owns0.1.2 release.

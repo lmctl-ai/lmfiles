@@ -1,44 +1,37 @@
 # Released database compatibility
 
-lmfiles 0.1.0 created database format1. lmfiles 0.1.1 uses format2. The checksummed
-compressed record frame remains version1; the enclosing DB version controls the
-alias-key and stage-summary representation.
+lmfiles 0.1.0 created format 1; 0.1.1 created format 2. Main (0.1.2)
+creates format 3. Opening either released format performs a bounded shadow
+migration under the exclusive writer lock. No reset is required.
 
-When0.1.1 opens a format1 DB, it holds the existing exclusive writer lock and:
+Format 2 interned alias families and omitted `last_success` when identical to the
+successful latest attempt. Format 3 changes event records: numeric item/sequence
+fields, length-delimited UTF-8 operation/timestamp and canonical JSON metadata,
+inside a version-2 CRC32C frame. Events are not individually Deflated; MVStore
+compresses pages across records. Item frames remain version 1. Logical records,
+IDs, event timestamps, claims, fences, replay markers and frontiers are preserved.
 
-1. Checks memory (at least32MiB configured) and free space for a shadow plus backup
-   (at least twice the old file size plus16MiB free).
-2. Copies every supported map to a sibling shadow file in bounded row/byte batches,
-   validating item/event CRCs. Unknown maps abort instead of being discarded.
-3. Interns alias `(kind,namespace)` families and stores each value separately from
-   those repeated names. Primary identity families remain internal/reserved.
-4. Elides `last_success` only when it exactly equals the successful latest attempt.
-   Distinct earlier success under a failed/newer attempt remains stored. Logical
-   query results preserve both views.
-5. Syncs the complete shadow, closes the old store, and copies/syncs a retained
-   `<db>.v1.bak` (a unique `.v1-<nonce>.bak` if that name already exists).
-6. Atomically replaces the DB and syncs the directory where supported. A crash
-   before/after the swap leaves a complete format1 or format2 DB, never a mixed
-   keyspace. Temporary files from a killed process are ignored on reopen.
+The upgrader requires at least 32 MiB configured memory and free space of at least
+2 × the old DB size + 16 MiB. It rejects unknown maps or malformed records, copies
+supported maps in bounded row/byte batches, syncs the shadow and old DB, retains a
+synced `<db>.v1.bak` or `<db>.v2.bak`, then atomically replaces the DB. Existing
+backups receive unique suffixes instead of being overwritten. Directory sync is
+required on POSIX; Windows uses the available filesystem provider. Failure before
+the swap leaves the original database intact. Crash recovery sees a complete old
+or new store, never a mixed keyspace; abandoned shadow files are ignored.
 
-The upgrader never resets an existing DB, overwrites a previous backup or fabricates
-history. Item IDs, metadata, events, frontiers, replay markers and claims are
-preserved. Ordinary failures before replacement leave format1 intact; the backup
-is retained after success. Atomic replacement/file-sync failures fail explicitly. Directory sync is strict
-on POSIX and uses the platform provider where available on Windows. Nonempty
-unversioned registries are rejected, never silently initialized or reset.
-Do not directly open the DB with another writer during upgrade.
+Old readers reject format 3. Stop writers and **copy** the appropriate retained
+backup to a separate restore path before downgrading. A downgrade loses changes
+made after upgrade; never open the new DB with an old binary as a repair attempt.
+Backups contain private registry data and are Git-ignored. Nonempty unversioned
+stores are rejected without reset.
 
-The0.1.0 binary refuses format2 (`unsupported-registry-format`). To roll back,
-stop all writers and **copy** the retained format1 backup to a separate restore
-path before using0.1.0. A reset is not required. Never run0.1.0 on format2 as an
-attempted repair. Backups contain private data and are ignored by Git.
+The snapshot JSONL envelope remains wire format 2, with `store_format:3` declaring
+the changed binary payloads. Main imports wire formats 1/2 from store formats
+1/2/3 transactionally, normalizing aliases/summaries/events. Missing footer,
+invalid checksum, unsupported maps or malformed event metadata abort the import.
+Released 0.1.1 rejects `store_format:3`; 0.1.0 rejects wire format 2.
 
-New snapshot exports use wire format2 with `store_format:2`. Version0.1.1 also
-imports legacy wire-format1 snapshots, upgrading their aliases/summaries inside
-the import transaction; truncation/corruption rolls the entire import back.
-Version0.1.0 rejects new wire-format2 snapshots at the header.
-
-The Linux gates test logical preservation, structured-byte aliases, identity
-lookup, failed/latest versus last-success, no repeated migration, backup readability,
-legacy/new snapshot import and kills on both sides of the atomic replacement.
+Linux managed/native gates test preservation, corruption/truncation rejection,
+byte aliases, identity lookup, old/latest success ordering, one-time migration,
+retained backups, snapshot import and kills on both sides of atomic replacement.

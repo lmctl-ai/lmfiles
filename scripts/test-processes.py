@@ -150,7 +150,7 @@ def main() -> int:
             killed=call('--request',str(legacy),'doctor',env={'LMFILES_KILL_POINT':point},check=False)
             assert killed.returncode==77,killed.stderr
             upgraded=json.loads(call('--request',str(legacy),'doctor').stdout)
-            assert upgraded['format']=='2' and upgraded['items']=='1' and upgraded['events']=='1',upgraded
+            assert upgraded['format']=='3' and upgraded['items']=='1' and upgraded['events']=='1',upgraded
             assert list(root.glob(legacy.name+'.v1*.bak'))
             rows=call('--query',str(legacy),'query_subset','legacy','[{"kind":"path","namespace":"local","value":{"base64":"/w=="}}]','{}').stdout
             assert '"identity":"case"' in rows,rows

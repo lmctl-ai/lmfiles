@@ -6,26 +6,29 @@ import java.nio.channels.FileChannel;
 import java.nio.file.*;
 import java.util.*;
 
-/** A bounded shadow-file migration; format-1 bytes stay intact until atomic replacement. */
+/** Bounded shadow-file migrations; old bytes stay intact until atomic replacement. */
 final class StorageFormat {
-    static final String CURRENT="2";
+    static final String CURRENT="3";
     private static final Set<String> BYTES=Set.of("items","events");
-    private static final Set<String> STRINGS=Set.of("meta","differences","frontier","claims","active_claims","replay","dictionary");
+    private static final Set<String> STRINGS=Set.of("meta","differences","frontier","claims","active_claims","replay","dictionary","alias_families","claim_fences");
     private StorageFormat(){}
     static MVStore upgrade(MVStore old,Path path)throws IOException {
         if(Main.memoryBudget()<32L*1024*1024)throw new IOException("format upgrade requires LMFILES_MAX_MEMORY_MB >= 32");
         long size=Files.size(path);if(Files.getFileStore(path.getParent()).getUsableSpace()<Math.addExact(Math.multiplyExact(size,2),16L*1024*1024))throw new IOException("insufficient disk for format upgrade and backup");
         Set<String> allowed=new HashSet<>(STRINGS);allowed.addAll(BYTES);allowed.add("aliases");
         for(String name:old.getMapNames())if(!allowed.contains(name))throw new IOException("unknown format-1 map: "+name);
-        Path tmp=Files.createTempFile(path.getParent(),path.getFileName()+".upgrade-v2-",".tmp"),backup=backupName(path);
+        String source=old.<String,String>openMap("meta").getOrDefault("format","1");
+        if(!Set.of("1","2").contains(source))throw new IOException("unsupported-registry-format");
+        Path tmp=Files.createTempFile(path.getParent(),path.getFileName()+".upgrade-v3-",".tmp"),backup=backupName(path,source);
         MVStore shadow=null;boolean replaced=false;
         try {
             shadow=new MVStore.Builder().fileName(tmp.toString()).cacheSize(8).compress().autoCommitDisabled().open();
             int count=0;long buffered=0;
             for(String name:STRINGS){MVMap<String,String> src=old.openMap(name),dst=shadow.openMap(name);for(var e:src.entrySet()){dst.put(e.getKey(),e.getValue());buffered+=e.getKey().toString().length()*2L+e.getValue().toString().length()*2L;if(++count%256==0||buffered>=4194304){shadow.commit();buffered=0;}}}
-            for(String name:BYTES){MVMap<Long,byte[]> src=old.openMap(name),dst=shadow.openMap(name);for(var e:src.entrySet()){Map<String,Object> row=Store.decode(e.getValue());if(name.equals("items"))elide(row);byte[] encoded=Store.encode(row);dst.put(e.getKey(),encoded);buffered+=encoded.length;if(++count%256==0||buffered>=4194304){shadow.commit();buffered=0;}}}
+            for(String name:BYTES){MVMap<Long,byte[]> src=old.openMap(name),dst=shadow.openMap(name);for(var e:src.entrySet()){Map<String,Object> row=Store.decode(e.getValue());if(name.equals("items"))elide(row);byte[] encoded=name.equals("events")?Store.encodeEvent(row):Store.encode(row);dst.put(e.getKey(),encoded);buffered+=encoded.length;if(++count%256==0||buffered>=4194304){shadow.commit();buffered=0;}}}
             MVMap<String,String> families=shadow.openMap("alias_families"),meta=shadow.openMap("meta");MVMap<String,Long> src=old.openMap("aliases"),dst=shadow.openMap("aliases");
-            for(var e:src.entrySet()){List<?> a=legacyAlias(e.getKey());dst.put(aliasKey((String)a.get(0),(String)a.get(1),a.get(2),families,meta,true),e.getValue());buffered+=e.getKey().length()*2L;if(++count%256==0||buffered>=4194304){shadow.commit();buffered=0;}}
+            for(var e:src.entrySet()){if(source.equals("1")){List<?> a=legacyAlias(e.getKey());dst.put(aliasKey((String)a.get(0),(String)a.get(1),a.get(2),families,meta,true),e.getValue());}else dst.put(e.getKey(),e.getValue());buffered+=e.getKey().length()*2L;if(++count%256==0||buffered>=4194304){shadow.commit();buffered=0;}}
+            if(source.equals("2")){for(var e:old.<String,String>openMap("alias_families").entrySet()){families.put(e.getKey(),e.getValue());meta.put("alias_family:"+e.getValue(),e.getKey());}for(var e:old.<String,String>openMap("meta").entrySet())if(e.getKey().startsWith("alias_family:")||e.getKey().equals("next_alias_family"))meta.put(e.getKey(),e.getValue());}
             meta.put("format",CURRENT);meta.put("upgrade_backup",backup.toString());shadow.commit();shadow.sync();shadow.close();shadow=null;
             old.sync();old.close();
             Files.copy(path,backup,StandardCopyOption.COPY_ATTRIBUTES);forceFile(backup);forceDirectory(path.getParent());
@@ -43,7 +46,7 @@ final class StorageFormat {
         if(family==null&&create){family=Long.toString(Math.addExact(Long.parseLong(meta.getOrDefault("next_alias_family","0")),1));families.put(pair,family);meta.put("next_alias_family",family);meta.put("alias_family:"+family,pair);}
         return family==null?null:family+"\0"+J.str(value);
     }
-    private static Path backupName(Path path){Path backup=path.resolveSibling(path.getFileName()+".v1.bak");while(Files.exists(backup))backup=path.resolveSibling(path.getFileName()+".v1-"+UUID.randomUUID()+".bak");return backup;}
+    private static Path backupName(Path path,String source){Path backup=path.resolveSibling(path.getFileName()+".v"+source+".bak");while(Files.exists(backup))backup=path.resolveSibling(path.getFileName()+".v"+source+"-"+UUID.randomUUID()+".bak");return backup;}
     private static void forceFile(Path path)throws IOException{try(FileChannel c=FileChannel.open(path,StandardOpenOption.WRITE)){c.force(true);}}
     private static void forceDirectory(Path path)throws IOException{try(FileChannel c=FileChannel.open(path,StandardOpenOption.READ)){c.force(true);}catch(IOException|UnsupportedOperationException e){if(!System.getProperty("os.name").startsWith("Windows"))throw new IOException("directory sync required for upgrade",e);}}
     private static void kill(String point){if(point.equals(System.getenv("LMFILES_KILL_POINT")))Runtime.getRuntime().halt(77);}

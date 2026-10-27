@@ -12,8 +12,8 @@ if [[ "${1:-}" == "--native" ]]; then native=1; shift; fi
 
 if (( native == 0 )); then
   [[ "${SKIP_BUILD:-0}" == 1 ]] || run 1800 mvn -q package
-  host=(java -jar target/lmfiles-0.1.1-all.jar)
-  [[ -f target/lmfiles-0.1.1-all.jar ]]
+  host=(java -jar target/lmfiles-0.1.2-all.jar)
+  [[ -f target/lmfiles-0.1.2-all.jar ]]
 else
   binary=target/lmfiles
   [[ ! -x target/lmfiles.exe ]] || binary=target/lmfiles.exe
@@ -30,7 +30,7 @@ python3 scripts/verify-deps.py
 "${host[@]}" --dsl-signatures > "$schema_tmp.signatures"
 lmscript --dsl-signatures "$schema_file" > "$schema_tmp.expected"
 diff -u "$schema_tmp.expected" "$schema_tmp.signatures"
-"${host[@]}" --version | grep -q '^lmfiles 0\.1\.1$'
+"${host[@]}" --version | grep -q '^lmfiles 0\.1\.2$'
 "${host[@]}" --notices | grep -q 'Lattice Systems LLC'
 
 fixture=$(mktemp -d "${TMPDIR:-/tmp}/lmfiles-gate.XXXXXX")
@@ -52,6 +52,26 @@ PY
 run 120 "${host[@]}" --lease-test "$fixture/leases"
 run 120 "${host[@]}" --review-test "$fixture/review"
 run 120 "${host[@]}" --storage-test "$fixture/storage"
+run 240 "${host[@]}" --scan-test "$fixture/scan"
+
+# Exercise scan through both the actual lmcode binding and the CLI dispatch.
+python3 - "$fixture" <<'PYSCAN'
+import json,sys
+from pathlib import Path
+work=Path(sys.argv[1]);tree=work/'dsl-scan';tree.mkdir();(tree/'input.txt').write_text('synthetic scan input')
+body='let p = _lmcode_ schema='+json.dumps(str(Path.cwd()/'schema/lmfiles.dsl.json'))+';\nlet db=registry.open('+json.dumps(str(work/'dsl-scan.mv'))+',"cli","{}");\nfile_write('+json.dumps(str(work/'scan-result.json'))+',db.scan('+json.dumps(str(tree))+',"{}"));db.close();\nend _lmcode_\nsavedsl(p,'+json.dumps(str(work/'scan.dslb'))+');\n'
+(work/'scan.lms').write_text(body)
+PYSCAN
+run 30 lmscript "$fixture/scan.lms"
+run 30 "${host[@]}" --dsl "$fixture/scan.dslb"
+run 30 "${host[@]}" --request "$fixture/dsl-scan.mv" scan "$fixture/dsl-scan" '{}' > "$fixture/scan-cli.json"
+python3 - "$fixture" <<'PYSCANRESULT'
+import json,sys
+from pathlib import Path
+work=Path(sys.argv[1]);first=json.loads((work/'scan-result.json').read_text());again=json.loads((work/'scan-cli.json').read_text())
+assert first['files']=='1' and first['hashed']=='1',first
+assert again['files']=='1' and again['hashed']=='0',again
+PYSCANRESULT
 
 # Fresh processes cover same-DB reopen, commit killpoints, lock ownership and
 # optional network syscall denial. The harness fails on missing request/lock APIs.

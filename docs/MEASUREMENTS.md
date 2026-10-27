@@ -107,3 +107,52 @@ and clock/fencing behavior in [LEASES.md](LEASES.md). The patch's Linux gates ad
 regressions and21 subprocess checks (12 fault points), alongside63 core and17
 journal assertions. The previously recorded five-platform CI is for0.1.0; no CI,
 tag or release is dispatched by this patch. No AWS/admin command was run.
+
+
+## 1C-a: real local pairings, scan and compact events
+
+[Machine-readable evidence](measurements-1c-a.json). Both comparable storage runs
+use Java21, -Xmx256m, identical SDK/H2 pins and the unchanged 10,000-item profile.
+Files are fresh/uncompacted; no events, aliases or user metadata are removed.
+
+| Physical DB | Bytes | Bytes/item |
+|---|---:|---:|
+| Released format2 codec before | 14,802,944 | 1,480.2944 |
+| Format3 compact events after | 8,044,544 | 804.4544 |
+| Saved | 6,758,400 | 675.84 (45.6558%) |
+
+The profile has10,000 items,60,100 events,40,000 aliases,five stages/item and100
+pending items. The frontier examines100 records. Compact binary event headers
+plus canonical raw metadata let MVStore compress repeated fields across pages,
+instead of Deflating each event separately. The750–1,050B target is met for this
+small fixture. It is not a100M/heavy-profile qualification. Single-run latencies
+are noisy: before/after frontier2.587/2.746ms and1,000 subset queries39.549/88.903ms;
+no throughput improvement is claimed from those timings. Earlier exploratory
+format3 measurement was800.3584B/item; page/timestamp variation is expected.
+
+An isolated native100k-file scan hashes100,000 files in10.507s (9,517files/s).
+No-op rescan:1.517s (65,920files/s),zero hashes. This includes local stat/traversal,
+registry reads and any batched commits; fixture creation is excluded. Both full
+managed/native gates also exercise100k scans (29 assertions each), alongside63
+core,17 journal,23 lease,22 review and111 storage assertions:265 total per runtime.
+Each runs21 subprocess checks/12 fault points, DSL and CLI scan bindings, memory
+limits, signatures and gallery validation. Native also passes the6GiB virtual
+address-space check. No new macOS/Windows execution is claimed.
+
+Real pairings pass against checksum-verified released Linux assets lmcurl0.1.2 and
+lmssh0.1.1 with the native registry:12 HTTP checks,11 SFTP checks and12 pipeline
+checks. HTTP verifies actual304, exact validators,404 suppression, timeout and
+disconnect receipts/failure counts. SFTP kills the **public job** while upload and
+download files are incomplete, confirms no success projection for the interrupted
+stage, resumes the same job with reput/reget, verifies bytes and proves no-op
+reruns/strict host-key refusal. No remote listing or remote checksum command is
+used. The pipeline injects effect-before-receipt failures at fetched, cleaned and
+published stages, then replays and converges. New pictures are generated from
+these local runs. Original gallery files/captions are validated by the gate; the
+optional legacy render-all campaign is not claimed as rerun here.
+
+Format1/2 upgrades retain backups; an additional native upgrade of the real
+released-code10k format2 DB preserved item/event counts, the prior reader reads
+the backup, and refuses format3. See FORMAT_UPGRADE.md. Core remains network-free;
+all transport tests use loopback and synthetic data. No AWS/admin command, real
+remote, workflow dispatch, tag or release was run for1C-a.

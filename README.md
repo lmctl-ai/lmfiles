@@ -26,15 +26,16 @@ executor. Confirmed journal receipts advance each user-defined stage. Rerun afte
 
 ## Build and run
 
-Version **0.1.0 is released**. Current main targets **0.1.1**; this patch is
-not tagged or released by its implementer. README URLs install the published
-latest version. To exercise0.1.1 before the Lead publishes it, build locally and
-put that binary on PATH. lmplot supplies the pictures; publish_ttl additionally
-uses explicit lmaws demo mode. All example inputs are synthetic.
+Versions **0.1.0 and 0.1.1 are released**. Current main targets **0.1.2**;
+the implementer does not tag or release it. README pairings use existing released
+APIs and install every host from `github:lmctl-ai/<name>@latest`. The new scan
+method requires a local main build until the Lead releases 0.1.2. All inputs and
+pictures are synthetic. Real HTTP and SFTP examples restrict connections to local
+fixtures; the upload executor remains a local fake.
 
-Format1 databases from0.1.0 are automatically upgraded with a retained backup.
-Read [the upgrade/rollback contract](docs/FORMAT_UPGRADE.md) before opening an
-existing DB with0.1.1. There is no reset or silent deletion.
+Opening a format 1/2 DB with main upgrades it to format 3 with a retained backup.
+Read [the upgrade/rollback contract](docs/FORMAT_UPGRADE.md). There is no reset or
+silent deletion.
 
 ```sh
 mvn -q package                         # Java 21+; immutable SDK archive verified
@@ -66,7 +67,9 @@ excluded and a minimal explicit reflection configuration is supplied.
 - Provides bounded cursors, batches, snapshots, leased/fenced claims and local integrity checks.
 - Optionally validates a checksummed plan/result journal and records only reported outcomes.
 
-No fetching, uploading, local-file deletion, stage ordering, retry/retention rule,
+The optional [scan helper](docs/SCAN.md) streams local files into observations; it
+uses stat-first hashing, bounded batches and directory shards. No fetching,
+uploading, local-file deletion, stage ordering, retry/retention rule,
 remote listing, remote stat, HEAD, credential lookup or scheduling happens in core.
 A record is a **belief reported by the caller**, not proof of current remote state.
 Outside changes are invisible until the script chooses to verify them. A query
@@ -99,7 +102,8 @@ an exact process RSS quota; native runtime/cache overhead is reported separately
 
 One process owns the writer OS lock. Every mutation/batch commits and syncs
 before acknowledgment; failed batches roll back together. CRC32C-protected,
-compressed binary item/event rows are co-located; stage IDs and alias families are interned. Equal latest/success
+compressed item rows and compact binary event frames use MVStore page compression;
+stage IDs and alias families are interned. Equal latest/success
 summaries share one stored representation.
 Snapshots pin MVStore versions; queries stream bounded pages. Claims coordinate
 local workers, not remote exactly-once effects. Fixed deadlines survive process reopen; persisted generations fence expired or
@@ -113,15 +117,17 @@ aliases can be represented as tagged Base64 bytes; unsupported local-path I/O is
 rejected. A transfer completed before any durable result remains unconfirmed and
 may be repeated. See [docs/JOURNAL.md](docs/JOURNAL.md).
 
-The initial codec deliberately favors explicit correctness and compact compressed
-payloads over a custom LSM. It does **not** claim the design's unmeasured
-750–1,050 bytes/item target or a 100M qualification. Measured workloads and crash
+The format-3 10,000-item profile measures **804.45 bytes/item**, within the design's
+750–1,050 target for that fixture (format 2: 1,480.29). This is not a 100M
+qualification. Measured workloads and crash
 results are recorded in [docs/MEASUREMENTS.md](docs/MEASUREMENTS.md).
 
 ## Development
 
 `test.sh` is the gate. CI is **workflow_dispatch only**, has no cloud credentials,
-and does not tag/release. `examples/render-all.sh` regenerates the six gallery images.
+and does not tag/release. `examples/render-all.sh` regenerates the nine gallery images. The real local pairing checks are
+`scripts/test-pairings.py`, `scripts/test-sftp.py` and `scripts/test-pipeline.py`;
+run them with all hosts on PATH. Each supports `--gallery`.
 The original design and review live in the sibling lmaws repo; implementation notes
 and 1C scope are in [durable-memory/index.md](durable-memory/index.md).
 

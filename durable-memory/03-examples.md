@@ -22,7 +22,7 @@ its README picture. Explicit hosts install from `github:lmctl-ai/<name>@latest`.
 `download_lmcurl.lms` uses released lmcurl 0.1.2 Request.allow_error plus ETag and
 Last-Modified headers against loopback only. It reads a URL list, queries registry
 stage metadata, skips recorded gone URLs, verifies unchanged candidates locally,
-and records outcomes/failure counts. `scripts/test-pairings.py`:11 checks.
+and records outcomes/failure counts. `scripts/test-pairings.py`:12 checks.
 
 `sftp_registry.lms` uses released lmssh 0.1.1 and a private temporary sshd (Python3,
 ssh-keygen and installed sshd required). Strict known_hosts, reput/reget -p,

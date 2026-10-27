@@ -13,6 +13,7 @@ public final class HostApi {
   public static final List<Binding> BINDINGS=List.of(
     m("Registry","open","Registry","string","string","string"),
     m("Registry","close","void"),
+    m("Registry","scan","string","string","string"),
     m("Registry","log_append","string","string","string","string"),
     m("Registry","instruction_digest","string","string"),
     m("Registry","unconfirmed","string","string","string","string"),

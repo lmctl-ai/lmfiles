@@ -41,6 +41,7 @@ public final class DslHost implements AutoCloseable {
       if(n.equals("apply_records"))return Value.ofString(store(self).call("apply_records",vals(a)));
       if(n.equals("open")){return open(ctx,a);}Store s=store(self);return switch(n){
       case "close"-> {s.close();stores.remove(s);yield Value.none();}
+      case "scan"->Value.ofString(s.call("scan",vals(a)));
       case "item_upsert","alias_add","alias_remove","observe","stage_record","stage_forget","item_tombstone","difference_index","renew","release","complete","doctor","export_records"->Value.ofString(s.call(n,vals(a)));
       case "query_subset","stage_difference"->Value.object("Cursor",s.query(n,vals(a)));
       case "claim"->Value.object("Cursor",s.query(n,vals(a)));

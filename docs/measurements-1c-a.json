@@ -1,0 +1,113 @@
+{
+  "milestone": "1C-a",
+  "version": "0.1.2 (main, not released by implementer)",
+  "platform": "Linux x64",
+  "scope": "Synthetic local fixtures only; no AWS, admin commands or real remote hosts",
+  "storage": {
+    "runtime": "Java 21 -Xmx256m, identical SDK/H2 and benchmark generator, fresh uncompacted physical DBs",
+    "before": {
+      "build_seconds": 2.646961463,
+      "bytes_per_item": 1480.2944,
+      "disk_bytes": "14802944",
+      "items": 10000,
+      "events": 60100,
+      "pending": 100,
+      "reopen_query_ms": 2.587182,
+      "subset_queries": 1000,
+      "subset_query_ms": 39.548565,
+      "format": "2"
+    },
+    "after": {
+      "build_seconds": 4.761956926,
+      "bytes_per_item": 804.4544,
+      "disk_bytes": "8044544",
+      "doctor": {
+        "alias_families": "4",
+        "events": "60100",
+        "examined": "100",
+        "format": "3",
+        "items": "10000",
+        "status": "ok",
+        "storage": "MVStore positional I/O, compressed CRC32C binary records"
+      },
+      "items": 10000,
+      "pending": 100,
+      "profile": "three explicit aliases plus identity index, five stages, six events/item before pending updates; compact synthetic metadata",
+      "reopen_query_ms": 2.7458,
+      "scope": "local measured workload, not 100M qualification",
+      "subset_queries": 1000,
+      "subset_query_ms": 88.902938
+    },
+    "saved_bytes": 6758400,
+    "reduction_percent": 45.6558,
+    "limits": "Single runs, timestamp/page compression and load vary; not 100M or heavy-profile qualification"
+  },
+  "native_scan_isolated": {
+    "assertions": 29,
+    "elapsed_ms": 18245,
+    "files": 100000,
+    "first_scan_elapsed_ms": 10507,
+    "first_scan_files_per_second": 9517,
+    "first_scan_hashed": 100000,
+    "noop_scan_elapsed_ms": 1517,
+    "noop_scan_files_per_second": 65920,
+    "noop_scan_hashed": 0,
+    "ok": true
+  },
+  "gates_per_runtime": {
+    "core_assertions": 63,
+    "journal_assertions": 17,
+    "lease_assertions": 23,
+    "review_assertions": 22,
+    "storage_assertions": 111,
+    "scan_assertions": 29,
+    "total_assertions": 265,
+    "subprocess_checks": 21,
+    "fault_points": 12,
+    "scan_bindings": "DSL first ingest and CLI no-op with matching namespace",
+    "managed": "passed",
+    "native": "passed",
+    "native_address_space_limit_bytes": 6442450944
+  },
+  "pairings_released_hosts_native_registry": {
+    "lmcurl_version": "0.1.2",
+    "lmssh_version": "0.1.1",
+    "asset_checksums_verified": true,
+    "http": {
+      "ok": true,
+      "http_pairing_checks": 12,
+      "cloud_requests": 0
+    },
+    "sftp": {
+      "ok": true,
+      "sftp_pairing_checks": 11,
+      "upload_partial_bytes": 522240,
+      "download_partial_bytes": 261120,
+      "total_bytes": 75497472,
+      "remote_listing": false,
+      "cloud_requests": 0
+    },
+    "pipeline": {
+      "ok": true,
+      "pipeline_checks": 12,
+      "interrupted_stages": 3,
+      "cloud_requests": 0
+    }
+  },
+  "compatibility": {
+    "released_format_2_profile_upgrade": "10000 items and 60100 events preserved",
+    "retained_format_2_backup": "readable by prior 0.1.1 jar",
+    "prior_reader": "rejects format 3",
+    "format_1_2_shadow_upgrade_kills": "covered by storage/process harness"
+  },
+  "native_artifact": {
+    "bytes": 29493512,
+    "sha256": "e6b4aee6050aeb44ccbba8cd9bf22d2c26776f16b24c6ffcac1400cbf32e7101"
+  },
+  "limitations": [
+    "No new non-Linux qualification",
+    "SFTP helper/test requires installed local sshd; test process-tree interruption uses Linux /proc",
+    "Old gallery render-all optional campaign not rerun in this task; its files/captions checked, all three new pictures generated from real local runs",
+    "No CI dispatch, tag or release"
+  ]
+}

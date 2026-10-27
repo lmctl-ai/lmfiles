@@ -181,3 +181,18 @@ Final Linux managed/native gates pass:63 core,17 journal,23 lease,22 review and2
 upgrade assertions, plus21 subprocess checks covering12 fault points. The new
 review tests include exact registered-callback budgets for one next_json charge
 and materialized row charging. No AWS/admin commands or new tag/release.
+
+
+## 1C-a follow-up
+
+Format3 addresses the measured event overhead with compact binary event frames
+and page compression. The unchanged10k workload measures804.4544B/item versus
+1,480.2944 for format2 (45.66% smaller), with60,100 events retained. This meets the
+small-profile target, not large-tier qualification. Formats1/2 use the retained
+backup/shadow migration; malformed records fail rather than inventing history.
+See FORMAT_UPGRADE.md and measurements-1c-a.json.
+
+The optional scan helper is implemented and qualified on100k local files. Real
+lmcurl0.1.2/lmssh0.1.1 local pairings and whole-job interruption recovery replace
+stand-ins for HTTP/SFTP. Cloud publication remains a deterministic local fake.
+The general indexes/cursors/archive/mailbox portion of1C remains deferred.

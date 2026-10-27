@@ -15,7 +15,7 @@ fn waiting_job() {
   write_file(STOP,"stop");return true;
 }
 fn job(base) {
-  assert(starts_with(base,"http://127.0.0.1:"),"local fixture URL required");
+  assert(regex_test(base,"^http://127[.]0[.]0[.]1:[0-9]{1,5}$"),"local fixture URL required");
   let LIST=ARGV.len()>1?ARGV[1]:ROOT+"/urls.txt";
   if(ARGV.len()<2) { write_file(LIST,base+"/stable\n"+base+"/gone\n"+base+"/slow\n"+base+"/fail\n"+base+"/disconnect\n"); }
   let urls=read_lines(LIST);let requests=0;let conditional=0;let gone=0;let failed=0;let skipped=0;let fetched=0;
@@ -43,7 +43,7 @@ end _lmcode_
       let ETAG=candidate?metadata.get("etag",""):"";let MODIFIED=candidate?metadata.get("last_modified",""):"";
       let TEMP=FILE+".partial";let TIMEOUT=contains(url,"/slow")?100:1500;
       let fetch=_lmcode_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
-let q=curl.session(${url}).get("").proxy("").timeout(${TIMEOUT}).limit(1048576).allow_error(true);
+let q=curl.session(${url}).get("").proxy("").follow(false).timeout(${TIMEOUT}).limit(1048576).allow_error(true);
 if(${ETAG}!=""){q.header("If-None-Match",${ETAG});}
 if(${MODIFIED}!=""){q.header("If-Modified-Since",${MODIFIED});}
 let r=q.send();

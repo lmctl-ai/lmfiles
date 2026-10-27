@@ -9,5 +9,8 @@
 - [../docs/MEASUREMENTS.md](../docs/MEASUREMENTS.md): measured size/latency/test evidence.
 - [../docs/measurements.json](../docs/measurements.json): synthetic local measurements and exact native digest.
 - [../docs/LEASES.md](../docs/LEASES.md):0.1.1 fixed deadlines, clock eras and generation fencing.
-- [../docs/FORMAT_UPGRADE.md](../docs/FORMAT_UPGRADE.md):released format1 to2 backup, migration and rollback contract.
+- [../docs/FORMAT_UPGRADE.md](../docs/FORMAT_UPGRADE.md):released format1/2 to3 backup, migration and rollback contract.
 - [../docs/measurements-0.1.1.json](../docs/measurements-0.1.1.json): comparable format1/format2 10k storage results and patch gate counts.
+
+- [../docs/SCAN.md](../docs/SCAN.md): optional incremental local ingestion and failure semantics.
+- [../docs/measurements-1c-a.json](../docs/measurements-1c-a.json): compact storage, scan and real local pairing evidence.

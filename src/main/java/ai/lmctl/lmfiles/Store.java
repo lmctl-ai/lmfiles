@@ -50,7 +50,8 @@ public final class Store implements AutoCloseable {
             } else builder.fileName(this.path.toString());
             db=builder.open();
             MVMap<String,String> header=db.openMap("meta");
-            if("1".equals(header.get("format"))){db=StorageFormat.upgrade(db,this.path);db.setCacheSize((int)cache);faultFile=null;}
+            String diskFormat=header.get("format");
+            if("1".equals(diskFormat)||"2".equals(diskFormat)){db=StorageFormat.upgrade(db,this.path);db.setCacheSize((int)cache);faultFile=null;}
             items=db.openMap("items");events=db.openMap("events");aliases=db.openMap("aliases");
             meta=db.openMap("meta");differences=db.openMap("differences");frontier=db.openMap("frontier");
             claims=db.openMap("claims");activeClaims=db.openMap("active_claims");replay=db.openMap("replay");dictionary=db.openMap("dictionary");
@@ -78,6 +79,31 @@ public final class Store implements AutoCloseable {
     private void durable(){kill("before_commit");if(faultFile!=null&&!faultFile.point.equals("mid_compaction"))faultFile.armed=true;db.commit();db.sync();kill("after_commit");}
     private String mutate(Supplier<String> action){check();boolean registered=leaseOwnerRegistered;long owner=clockOwnerGeneration,era=clockAnchorEra,millis=clockAnchorMillis,nanos=clockAnchorNanos;try{String r=action.get();durable();return r;}catch(RuntimeException|Error e){db.rollback();leaseOwnerRegistered=registered;clockOwnerGeneration=owner;clockAnchorEra=era;clockAnchorMillis=millis;clockAnchorNanos=nanos;throw e;}}
     private Map<String,Object> row(String id){byte[] b=items.get(id(id));if(b==null)throw new IllegalArgumentException("unknown-item");return decode(b);}
+    /** Read-only identity lookup used by the optional local scanner. */
+    synchronized Map<String,Object> lookupIdentity(String external){
+        check();
+        String key=StorageFormat.aliasKey("identity",namespace,required(external,"identity"),aliasFamilies,meta,false);
+        if(key==null)return Map.of();
+        Long number=aliases.get(key);
+        return number==null?Map.of():logicalRow(decode(items.get(number)));
+    }
+    static final class ScanRecord {
+        final String identity; final Map<String,Object> fields;
+        ScanRecord(String identity, Map<String,Object> fields){this.identity=identity;this.fields=fields;}
+    }
+    /** Apply a bounded scanner batch as one durable transaction. */
+    synchronized void scanBatch(List<ScanRecord> records){
+        if(records.isEmpty())return;
+        long bytes=0,limit=Math.min(16L*1024*1024,Main.memoryBudget()/4);
+        for(ScanRecord record:records)bytes+=J.str(Map.of("id",record.identity,"fields",record.fields)).getBytes(StandardCharsets.UTF_8).length;
+        if(bytes>limit)throw new IllegalArgumentException("scan-batch-exceeds-LMFILES_MAX_MEMORY_MB");
+        mutate(()->{for(ScanRecord record:records){
+            Map<String,Object> prior=lookupIdentity(record.identity);
+            String item=J.text(prior,"item","");
+            if(item.isEmpty())item=J.text(J.obj(upsert(Map.of("id",record.identity),Map.of())),"item","");
+            observe(item,record.fields);
+        }return ok("records",Integer.toString(records.size()));});
+    }
     private static long id(String s){try{long id=Long.parseLong(s);if(id<=0)throw new NumberFormatException();return id;}catch(NumberFormatException e){throw new IllegalArgumentException("invalid-item-id");}}
     private void save(String id,Map<String,Object> r){StorageFormat.elide(r);items.put(id(id),encode(r));}
     private String aliasKey(Map<String,Object> a,boolean create){keys(a,"kind","namespace","value");String kind=required(text(a,"kind"),"alias kind");if("identity".equals(kind))throw new IllegalArgumentException("reserved-alias-kind");return StorageFormat.aliasKey(kind,required(text(a,"namespace"),"alias namespace"),Objects.requireNonNull(a.get("value"),"alias value"),aliasFamilies,meta,create);}
@@ -86,7 +112,7 @@ public final class Store implements AutoCloseable {
     private Map<String,Object> projection(Map<String,Object> row,Map<String,Object> selector){String d=stageId(text(selector,"stage"),text(selector,"namespace"),text(selector,"slot"),false);if(d==null)return Map.of();Object v=stages(row).get(d);if(v==null)return Map.of();Map<String,Object> result=map(v);String p=J.text(selector,"projection","latest_attempt");if(!Set.of("latest_attempt","last_success").contains(p))throw new IllegalArgumentException("invalid-projection");return p.equals("last_success")?success(result):result;}
     private static Map<String,Object> logicalRow(Map<String,Object> row){for(var e:stages(row).entrySet()){Map<String,Object> p=map(e.getValue());Map<String,Object> success=success(p);if(!success.isEmpty())p.put("last_success",success);}return row;}
     private static Map<String,Object> success(Map<String,Object> latest){if(latest.containsKey("last_success"))return map(latest.get("last_success"));return "ok".equals(text(latest,"status"))?new LinkedHashMap<>(latest):Map.of();}
-    private void event(String item,String operation,Map<String,Object> data){long n=next("next_event");events.put(n,encode(Map.of("sequence",Long.toString(n),"item",item,"operation",operation,"committed_at",Instant.now().toString(),"data",data)));}
+    private void event(String item,String operation,Map<String,Object> data){long n=next("next_event");events.put(n,encodeEvent(Map.of("sequence",Long.toString(n),"item",item,"operation",operation,"committed_at",Instant.now().toString(),"data",data)));}
 
     private static void checkInputBudget(String... a){long limit=Math.min(MAX_RECORD,Main.memoryBudget()/4);for(String arg:a)if(arg!=null&&arg.getBytes(StandardCharsets.UTF_8).length>limit)throw new IllegalArgumentException("input-exceeds-LMFILES_MAX_MEMORY_MB");}
     public synchronized String call(String op,String... a){
@@ -96,6 +122,7 @@ public final class Store implements AutoCloseable {
         if(op.equals("replay_seen"))return json(Map.of("digest",replay.getOrDefault(a[0],"")));
         if(op.equals("export_records")){if(a.length>1)keys(J.obj(a[1]),"v");return export(Path.of(a[0]));}
         if(op.equals("compact")){kill("before_compaction");int prevRetention=db.getRetentionTime();if(faultFile!=null||snapshots.isEmpty())db.setRetentionTime(0);if(faultFile!=null)faultFile.armed=true;try{db.compactFile(1000);db.sync();}finally{db.setRetentionTime(prevRetention);}kill("after_compaction");return ok();}
+        if(op.equals("scan"))return LocalScan.scan(this,Path.of(a[0]),a[1]);
         if(op.equals("stats"))return ok("examined",Long.toString(examined),"items",Long.toString(items.sizeAsLong()),"events",Long.toString(events.sizeAsLong()),"retention_ms",Integer.toString(db.getRetentionTime()));
         if(op.equals("apply_records")){if(a.length>2)keys(J.obj(a[2]),"v");try{return PlanLog.apply(this,Path.of(a[0]),Path.of(a[1]));}catch(IOException e){throw new UncheckedIOException(e);}}
         expiryObserved=false;String response=mutate(()->change(op,a));if(expiryObserved)kill("after_claim_expiry");if(op.equals("claim"))kill("after_claim_commit");return response;
@@ -323,12 +350,12 @@ public final class Store implements AutoCloseable {
         if(!items.isEmpty()||!events.isEmpty()||!aliases.isEmpty()||!differences.isEmpty()||!claims.isEmpty()||!replay.isEmpty())throw new IllegalArgumentException("import-requires-empty-registry");long rows=0;boolean end=false;
         try(var lines=Files.newBufferedReader(input)){
             String first=boundedLine(lines);if(first==null||!"snapshot".equals(text(J.obj(first),"kind"))||!Set.of("1","2").contains(J.text(J.obj(first),"format","")))throw new IllegalArgumentException("snapshot-header");
-            String sourceFormat=J.text(J.obj(first),"store_format","1");if(!Set.of("1",StorageFormat.CURRENT).contains(sourceFormat))throw new IllegalArgumentException("snapshot-store-format");
+            String sourceFormat=J.text(J.obj(first),"store_format","1");if(!Set.of("1","2",StorageFormat.CURRENT).contains(sourceFormat))throw new IllegalArgumentException("snapshot-store-format");
             String line;while((line=boundedLine(lines))!=null){Map<String,Object> r=J.obj(line);
                 if("end".equals(text(r,"kind"))){if(Long.parseLong(text(r,"rows"))!=rows||boundedLine(lines)!=null)throw new IllegalArgumentException("snapshot-count");end=true;break;}
                 String checksum=text(r,"checksum");r.remove("checksum");if(!PlanLog.sha(json(r)).equals(checksum))throw new IllegalArgumentException("snapshot-checksum");
                 String name=text(r,"map"),key=text(r,"key");Object v=r.get("value");switch(name){
-                    case "items","events" -> {byte[] bytes=Base64.getDecoder().decode(text(map(v),"base64"));Map<String,Object> decoded=decode(bytes);if(name.equals("items")){StorageFormat.elide(decoded);bytes=encode(decoded);}(name.equals("items")?items:events).put(Long.parseLong(key),bytes);}
+                    case "items","events" -> {byte[] bytes=Base64.getDecoder().decode(text(map(v),"base64"));Map<String,Object> decoded=decode(bytes);if(name.equals("items")){StorageFormat.elide(decoded);bytes=encode(decoded);}else bytes=encodeEvent(decoded);(name.equals("items")?items:events).put(Long.parseLong(key),bytes);}
                     case "aliases" -> {if(sourceFormat.equals("1")){List<?> a=StorageFormat.legacyAlias(key);key=StorageFormat.aliasKey((String)a.get(0),(String)a.get(1),a.get(2),aliasFamilies,meta,true);}aliases.put(key,new java.math.BigDecimal(v.toString()).longValueExact());}
                     case "meta","differences","frontier","claims","active_claims","replay","dictionary","alias_families","claim_fences" -> {if(name.equals("meta")&&key.equals("format")){if(!sourceFormat.equals(v.toString()))throw new IllegalArgumentException("snapshot-format-mismatch");}else{MVMap<String,String> target=db.openMap(name);target.put(key,v.toString());}}
                     default -> throw new IllegalArgumentException("unknown-snapshot-map");
@@ -340,7 +367,22 @@ public final class Store implements AutoCloseable {
     }
     private static String boundedLine(BufferedReader reader)throws IOException {StringBuilder out=new StringBuilder();int c;long limit=Math.min(2L*MAX_RECORD,Main.memoryBudget()/4);while((c=reader.read())!=-1){if(c=='\n')return out.toString();if(out.length()>=limit)throw new IllegalArgumentException("snapshot-line-exceeds-memory-budget");out.append((char)c);}return out.isEmpty()?null:out.toString();}
     static byte[] encode(Map<String,Object> map){try{byte[] raw=json(map).getBytes(StandardCharsets.UTF_8);if(raw.length>Math.min(MAX_RECORD,Main.memoryBudget()/4))throw new IllegalArgumentException("record-exceeds-memory-budget");var zipped=new ByteArrayOutputStream();try(var out=new DeflaterOutputStream(zipped)){out.write(raw);}byte[] data=zipped.toByteArray();CRC32C crc=new CRC32C();crc.update(data);ByteBuffer b=ByteBuffer.allocate(12+data.length);b.putInt(1).putInt(raw.length).putInt((int)crc.getValue()).put(data);return b.array();}catch(IOException e){throw new UncheckedIOException(e);}}
-    static Map<String,Object> decode(byte[] bytes){try{if(bytes.length<12)throw new IllegalStateException("record-truncated");ByteBuffer b=ByteBuffer.wrap(bytes);if(b.getInt()!=1)throw new IllegalStateException("record-version");int length=b.getInt(),check=b.getInt();if(length<0||length>MAX_RECORD)throw new IllegalStateException("record-length");byte[] data=Arrays.copyOfRange(bytes,12,bytes.length);CRC32C crc=new CRC32C();crc.update(data);if(check!=(int)crc.getValue())throw new IllegalStateException("record-checksum");try(var in=new InflaterInputStream(new ByteArrayInputStream(data))){byte[] raw=in.readNBytes(length+1);if(raw.length!=length)throw new IllegalStateException("record-size");return J.obj(new String(raw,StandardCharsets.UTF_8));}}catch(IOException e){throw new IllegalStateException("record-corrupt",e);}}
+    /** Compact event record: fixed numeric fields and raw UTF-8 fields let MVStore compress pages across rows. */
+    static byte[] encodeEvent(Map<String,Object> map){try{
+        keys(map,"sequence","item","operation","committed_at","data");
+        if(!(map.get("data") instanceof Map<?,?>))throw new IllegalArgumentException("event-data-required");
+        long sequence=Long.parseLong(text(map,"sequence")), item=Long.parseLong(text(map,"item"));
+        byte[] operation=text(map,"operation").getBytes(StandardCharsets.UTF_8), committed=text(map,"committed_at").getBytes(StandardCharsets.UTF_8), data=json(map.getOrDefault("data",Map.of())).getBytes(StandardCharsets.UTF_8);
+        if(sequence<1||item<1||operation.length==0||operation.length>65535||committed.length>65535||data.length>MAX_RECORD)throw new IllegalArgumentException("event-invalid-metadata");
+        try{Instant.parse(text(map,"committed_at"));}catch(RuntimeException badTimestamp){throw new IllegalArgumentException("event-invalid-metadata",badTimestamp);}
+        ByteArrayOutputStream raw=new ByteArrayOutputStream(32+operation.length+committed.length+data.length);DataOutputStream out=new DataOutputStream(raw);
+        out.writeLong(sequence);out.writeLong(item);out.writeShort(operation.length);out.write(operation);out.writeShort(committed.length);out.write(committed);out.writeInt(data.length);out.write(data);out.flush();
+        byte[] payload=raw.toByteArray();if(payload.length>Math.min(MAX_RECORD,Main.memoryBudget()/4))throw new IllegalArgumentException("event-exceeds-memory-budget");CRC32C crc=new CRC32C();crc.update(payload);ByteBuffer b=ByteBuffer.allocate(12+payload.length);b.putInt(2).putInt(payload.length).putInt((int)crc.getValue()).put(payload);return b.array();
+    }catch(IOException e){throw new UncheckedIOException(e);}}
+    static Map<String,Object> decode(byte[] bytes){try{if(bytes.length<12)throw new IllegalStateException("record-truncated");ByteBuffer b=ByteBuffer.wrap(bytes);int version=b.getInt();int length=b.getInt(),check=b.getInt();if(length<0||length>MAX_RECORD)throw new IllegalStateException("record-length");byte[] data;if(version==2){if(bytes.length!=12L+length)throw new IllegalStateException("record-length");data=Arrays.copyOfRange(bytes,12,12+length);}else {if(version!=1)throw new IllegalStateException("record-version");data=Arrays.copyOfRange(bytes,12,bytes.length);}CRC32C crc=new CRC32C();crc.update(data);if(check!=(int)crc.getValue())throw new IllegalStateException("record-checksum");if(version==2)return decodeEventPayload(data);try(var in=new InflaterInputStream(new ByteArrayInputStream(data))){byte[] raw=in.readNBytes(length+1);if(raw.length!=length)throw new IllegalStateException("record-size");return J.obj(decodeUtf8(raw));}}catch(IOException e){throw new IllegalStateException("record-corrupt",e);}}
+    private static String decodeUtf8(byte[] raw){try{return StandardCharsets.UTF_8.newDecoder().onMalformedInput(java.nio.charset.CodingErrorAction.REPORT).onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT).decode(ByteBuffer.wrap(raw)).toString();}catch(java.nio.charset.CharacterCodingException e){throw new IllegalStateException("record-utf8",e);}}
+    private static Map<String,Object> decodeEventPayload(byte[] payload)throws IOException {try(DataInputStream in=new DataInputStream(new ByteArrayInputStream(payload))){long sequence=in.readLong(),item=in.readLong();int ol=in.readUnsignedShort();if(sequence<1||item<1||ol<1||ol>payload.length)throw new IllegalStateException("event-corrupt");String operation=decodeUtf8(exact(in,ol));int cl=in.readUnsignedShort();if(cl<1||cl>payload.length)throw new IllegalStateException("event-corrupt");String committed=decodeUtf8(exact(in,cl));try{Instant.parse(committed);}catch(RuntimeException badTimestamp){throw new IllegalStateException("event-corrupt",badTimestamp);}int dl=in.readInt();if(dl<0||dl>MAX_RECORD)throw new IllegalStateException("event-corrupt");byte[] raw=exact(in,dl);if(in.read()!=-1)throw new IllegalStateException("event-corrupt");Map<String,Object> out=new LinkedHashMap<>();out.put("sequence",Long.toString(sequence));out.put("item",Long.toString(item));out.put("operation",operation);out.put("committed_at",committed);out.put("data",J.obj(decodeUtf8(raw)));return out;}}
+    private static byte[] exact(DataInputStream in,int length)throws IOException {byte[] out=in.readNBytes(length);if(out.length!=length)throw new IllegalStateException("event-corrupt");return out;}
     private void cleanup(){try{if(db!=null)db.closeImmediately();}catch(Exception ignored){}try{if(lock!=null)lock.release();}catch(Exception ignored){}try{if(lockChannel!=null)lockChannel.close();}catch(Exception ignored){}}
     @Override public synchronized void close(){if(!closed){for(Snapshot s:List.copyOf(snapshots))s.close();closed=true;try{if(db!=null)db.close();}finally{cleanup();}}}
 }

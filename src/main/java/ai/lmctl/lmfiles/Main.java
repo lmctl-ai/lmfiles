@@ -6,7 +6,7 @@ import java.nio.file.*;
 import java.util.*;
 
 public final class Main {
-  public static final String VERSION="0.1.1";
+  public static final String VERSION="0.1.2";
   private Main(){}
   public static long memoryBudget(){String v=System.getenv("LMFILES_MAX_MEMORY_MB");if(v==null)return 256L*1024*1024;try{long n=Long.parseLong(v);if(n<=0)throw new NumberFormatException();return Math.multiplyExact(n,1024L*1024);}catch(Exception e){throw new IllegalArgumentException("LMFILES_MAX_MEMORY_MB must be positive whole MiB");}}
   public static void main(String[] args){int code;try{code=run(args);}catch(OutOfMemoryError e){System.err.println("lmfiles: LMFILES_MAX_MEMORY_MB memory budget exceeded");code=3;}catch(VmException e){System.err.println("lmfiles: "+e.getMessage());code=Arrays.asList(args).contains("--dsl")?Reports.error("load",e):3;}catch(IllegalArgumentException e){System.err.println("lmfiles: "+e.getMessage());code=2;}catch(Exception e){String m=e.getMessage();System.err.println("lmfiles: "+(m==null?"registry operation failed ("+e.getClass().getSimpleName()+")":m));code=3;}if(code!=0)System.exit(code);}
@@ -28,6 +28,7 @@ public final class Main {
       case "--journal-test"->{if(args.length!=2)throw new IllegalArgumentException("--journal-test DIR");System.out.println(J.str(Map.of("ok",true,"assertions",PlanLogChecks.run(Path.of(args[1])))));return 0;}
       case "--lease-test"->{System.out.println(J.str(Map.of("ok",true,"assertions",LeaseChecks.run(Path.of(args[1])))));return 0;}
       case "--review-test"->{System.out.println(J.str(Map.of("ok",true,"assertions",ReviewChecks.run(Path.of(args[1])))));return 0;}
+      case "--scan-test"->{System.out.println(ScanChecks.runReport(Path.of(args[1])));return 0;}
       case "--storage-test"->{System.out.println(J.str(Map.of("ok",true,"assertions",StorageChecks.run(Path.of(args[1])))));return 0;}
       case "--make-v1-fixture"->{StorageChecks.createLegacy(Path.of(args[1]));System.out.println("{\"status\":\"ok\"}");return 0;}
       case "--benchmark"->{if(args.length!=3)throw new IllegalArgumentException("--benchmark DB COUNT");System.out.println(Bench.run(Path.of(args[1]),Integer.parseInt(args[2])));return 0;}

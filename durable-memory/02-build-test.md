@@ -1,24 +1,21 @@
-# Build and gate
+# Build, gates and releases
 
-mvn package verifies sdk.lock via scripts/sync-sdk.py; third_party sources are
-ignored and immutable-archive checksummed. H2 pinned in pom. No dependency drift.
-Managed launcher: scripts/lmfiles-managed copied to target/bin/lmfiles.
-Native: GraalVM25, scripts/build-native.sh. H2 AWT metadata excluded, explicit
-MetaType/FilePath reflect config, no mapped backend. Linux dynamic glibc only;
-CI Ubuntu22.04 baseline. Native reserved address space4GiB, maxheap3GiB.
+mvn package verifies immutable sdk.lock; H2 pinned in pom. GraalVM25 native-image
+via scripts/build-native.sh; exclude H2 AWT metadata and supply explicit reflection
+config. Linux uses dynamic glibc, other image dependencies static. Native reserved
+address space4GiB/maxheap3GiB; address-space/memory tests are in test.sh.
 
-Run test.sh and test.sh --native. CI is workflow_dispatch only, five platforms,
-local/fake tests only. v0.1.0 is released; this0.1.1 patch does not tag/release. Lead owns releases.
-SDK standards and host signatures must match compiler schema output. Notices
-embed MIT SDK license, H2 MPL2 text and runtime/platform attribution.
+Managed: copy scripts/lmfiles-managed to target/bin/lmfiles. Run test.sh, build
+native, then test.sh --native. Each Linux gate runs63 core,17 journal,23 lease,
+22 review,111 storage and29 scan assertions (100k files), DSL/CLI scan bindings,
+21 subprocess checks/12 fault points, schema/notices, memory and gallery checks.
+Native additionally repeats core under a6GiB virtual-address limit.
 
-All five managed/native jobs passed: https://github.com/lmctl-ai/lmfiles/actions/runs/40526639317
-Code:a8ebebb7fa26f732ffc669e3191dc5b988257d2d. No Windows stub is needed.
-The five-platform evidence above is for0.1.0. v0.1.1 is qualified locally on
-Linux by this task; no new tag/release or CI dispatch is made. Lead releases. Local native final gate also ran all six
-gallery jobs and six publication scenarios with real cloud request count0.
+Local real-product gates: scripts/test-pairings.py (12 HTTP checks), test-sftp.py
+(11 Linux checks including killed reput/reget), test-pipeline.py (12 checks).
+Require hosts on PATH; Python3 and private system sshd for SFTP. No cloud.
 
-0.1.1 Linux gate:63 core/17 journal/23 lease/22 review/22 upgrade assertions;
-21 subprocess checks/12 fault points, both JVM and native, plus address-space
-and memory limits. See docs/measurements-0.1.1.json. No AWS/admin invocation,
-CI dispatch, tag or release in this patch task.
+0.1.0 and0.1.1 released; main0.1.2 awaits Lead release. CI is manual dispatch only;
+no dispatch, tag or release by the1C-a implementer. Historical five-platform0.1.0
+CI: https://github.com/lmctl-ai/lmfiles/actions/runs/40526639317 . New evidence is
+Linux only; do not imply new macOS/Windows qualification. Measurements in docs.

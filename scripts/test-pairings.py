@@ -35,6 +35,8 @@ def main():
                 r=subprocess.run(['lmscript',str(ROOT/'examples/download_lmcurl.lms'),*args],cwd=work,text=True,capture_output=True,timeout=150)
                 assert r.returncode==0,(r.stdout,r.stderr)
                 return json.loads((work/'.lmfiles-local/download/report.json').read_text())
+            rejected=subprocess.run(['lmscript',str(ROOT/'examples/download_lmcurl.lms'),'http://127.0.0.1:1234@outside.invalid'],cwd=work,text=True,capture_output=True,timeout=30)
+            assert rejected.returncode!=0 and not Handler.calls;checks+=1
             first=run(base,str(urls))
             assert first==dict(requests=9,conditional=1,gone=1,failed=6,skipped=1,fetched=1,cloud_requests=0),first;checks+=1
             assert Handler.calls=={'/stable':2,'/gone':1,'/slow':2,'/fail':2,'/disconnect':2},Handler.calls;checks+=1

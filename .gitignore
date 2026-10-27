@@ -18,3 +18,6 @@ __pycache__/
 
 *.mv.v1*.bak
 *.upgrade-v2-*.tmp
+
+*.mv.v2*.bak
+*.upgrade-v3-*.tmp

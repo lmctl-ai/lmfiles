@@ -6,7 +6,7 @@ import org.h2.mvstore.MVStore;
 import java.nio.file.*;
 import java.util.*;
 
-/** Deterministic format-1 -> format-2 upgrade checks; invoked by the test CLI. */
+/** Deterministic format-1/2 -> current format upgrade checks; invoked by the test CLI. */
 public final class StorageChecks {
     private static int assertions;
     private StorageChecks() {}
@@ -56,11 +56,27 @@ public final class StorageChecks {
             @SuppressWarnings("unchecked") Map<String,Object> stages = (Map<String,Object>) row.get("stages");
             stages.put("1", published); stages.put("2", verify);
             items.put(1L, Store.encode(row));
-            events.put(1L, Store.encode(Map.of("sequence", "1", "item", "1", "operation", "legacy")));
+            events.put(1L, Store.encode(Map.of("sequence", "1", "item", "1", "operation", "legacy", "committed_at", "1970-01-01T00:00:00Z", "data", Map.of())));
             aliases.put(J.str(List.of("identity", "legacy", "case")), 1L);
             aliases.put(J.str(List.of("url", "source", "https://fixture/case")), 1L);
             aliases.put(J.str(List.of("path", "local", Map.of("base64", "/w=="))), 1L);
             db.commit(); db.sync();
+        }
+    }
+
+    /** Builds a released format-2 fixture with interned alias families for upgrade coverage. */
+    private static void createFormat2(Path file) throws Exception {
+        createLegacy(file);
+        try (MVStore db=MVStore.open(file.toString())) {
+            MVMap<String,Long> aliases=db.openMap("aliases"); aliases.clear();
+            MVMap<String,String> families=db.openMap("alias_families"), meta=db.openMap("meta");
+            families.put(J.str(List.of("identity","legacy")),"1");
+            families.put(J.str(List.of("url","source")),"2");
+            families.put(J.str(List.of("path","local")),"3");
+            meta.put("next_alias_family","3");meta.put("alias_family:1",J.str(List.of("identity","legacy")));
+            meta.put("alias_family:2",J.str(List.of("url","source")));meta.put("alias_family:3",J.str(List.of("path","local")));
+            aliases.put("1\0\"case\"",1L);aliases.put("2\0\"https://fixture/case\"",1L);aliases.put("3\0{\"base64\":\"/w==\"}",1L);
+            db.<String,String>openMap("meta").put("format","2");db.commit();db.sync();
         }
     }
 
@@ -81,12 +97,20 @@ public final class StorageChecks {
     public static int run(Path root) throws Exception {
         assertions = 0;
         Files.createDirectories(root);
+        Map<String,Object> compactFixture=Map.of("sequence","7","item","3","operation","observe","committed_at","2026-01-01T00:00:00Z","data",Map.of("hash","abc"));
+        byte[] compact=Store.encodeEvent(compactFixture);
+        ok(java.nio.ByteBuffer.wrap(compact).getInt()==2&&Store.decode(compact).equals(compactFixture), "compact event round-trip");
+        for(int cut=0;cut<compact.length;cut++){byte[] truncated=java.util.Arrays.copyOf(compact,cut);try{Store.decode(truncated);throw new AssertionError("truncated compact event accepted at "+cut);}catch(IllegalStateException expected){assertions++;}}
+        byte[] badHeader=compact.clone();badHeader[11]^=1;try{Store.decode(badHeader);throw new AssertionError("corrupt compact event accepted");}catch(IllegalStateException expected){assertions++;}
+        byte[] trailing=java.util.Arrays.copyOf(compact,compact.length+1);try{Store.decode(trailing);throw new AssertionError("trailing compact event accepted");}catch(IllegalStateException expected){assertions++;}
+        for(Map<String,Object> invalid:List.of(Map.of("sequence","0","item","3","operation","observe","committed_at","2026-01-01T00:00:00Z","data",Map.of()),Map.of("sequence","7","item","3","operation","","committed_at","2026-01-01T00:00:00Z","data",Map.of()),Map.of("sequence","7","item","3","operation","observe","committed_at","bad","data",Map.of()),Map.of("sequence","7","item","3","operation","observe","data",Map.of())))try{Store.encodeEvent(invalid);throw new AssertionError("invalid compact event accepted");}catch(IllegalArgumentException expected){assertions++;}
+        try{Store.encodeEvent(Map.of("sequence","7","item","3","operation","observe","committed_at","2026-01-01T00:00:00Z","data",Map.of("blob","x".repeat(2_000_000))));throw new AssertionError("oversize compact event accepted");}catch(IllegalArgumentException expected){assertions++;}
         Path db = root.resolve("legacy.mv");
         createLegacy(db);
         Path legacyExport=root.resolve("format1.jsonl");legacyExport(db,legacyExport);
 
         try (Store store = new Store(db, "legacy", "{}")) {
-            ok("2".equals(J.text(object(store.call("doctor")),"format","")), "upgrade sets format 2");
+            ok(StorageFormat.CURRENT.equals(J.text(object(store.call("doctor")),"format","")), "upgrade sets current format");
             ok("3".equals(J.text(object(store.call("doctor")),"alias_families","")), "all three families interned");
             String url = query(store, "[{\"kind\":\"url\",\"namespace\":\"source\",\"value\":\"https://fixture/case\"}]", "{}");
             ok(url.contains("case"), "URL alias resolves");
@@ -105,6 +129,8 @@ public final class StorageChecks {
             ok(!io.lmctl.lmcode.Json.object(summaries.get("1")).containsKey("last_success"),"equal success stays elided after late older receipt");
             ok(io.lmctl.lmcode.Json.object(summaries.get("2")).containsKey("last_success"),"distinct success retained on disk");
             ok(raw.getMapNames().contains("alias_families"),"family dictionary persisted");
+            byte[] event=raw.<Long,byte[]>openMap("events").get(1L);
+            ok(event!=null&&java.nio.ByteBuffer.wrap(event).getInt()==2,"events use compact format-3 codec");
         }
 
         Path firstBackup = backup(db);
@@ -118,7 +144,7 @@ public final class StorageChecks {
             ok(s.filter(p -> p.getFileName().toString().startsWith(db.getFileName() + ".v1.bak")).count() == backupCount, "reopen does not repeat upgrade backup");
         }
 
-        Path export = root.resolve("format2.jsonl");
+        Path export = root.resolve("format3.jsonl");
         try (Store store = new Store(db, "legacy", "{}")) { ok(status(store.call("export_records", export.toString(), "{}" )).equals("ok"), "format 2 export"); }
         Path restored = root.resolve("restored.mv");
         try (Store store = new Store(restored, "legacy", "{}")) {
@@ -141,6 +167,13 @@ public final class StorageChecks {
         try(MVStore raw=MVStore.open(missingVersion.toString())){raw.<String,String>openMap("meta").remove("format");raw.commit();raw.sync();}
         try{new Store(missingVersion,"legacy","{}");throw new AssertionError("unversioned data reset");}catch(IllegalStateException expected){assertions++;}
         ok(readMeta(missingVersion,"format")==null,"missing format not silently initialized over existing rows");
+
+        Path format2=root.resolve("format2.mv");createFormat2(format2);
+        try(Store store=new Store(format2,"legacy","{}")){
+            ok(StorageFormat.CURRENT.equals(J.text(object(store.call("doctor")),"format","")),"format 2 upgrades to current");
+            ok(query(store,"[{\"kind\":\"url\",\"namespace\":\"source\",\"value\":\"https://fixture/case\"}]","{}").contains("case"),"format 2 aliases preserved");
+        }
+        try(var s=Files.list(format2.getParent())){ok(s.anyMatch(p->p.getFileName().toString().equals(format2.getFileName()+".v2.bak")),"format 2 backup retained");}
         return assertions;
     }
 

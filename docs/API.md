@@ -1,4 +1,4 @@
-# Implemented 1A/1B API
+# Implemented registry API
 
 The generated schema is authoritative. Context `registry.open(path, namespace,
 options_json)` returns Registry. Options accept v and cache_mb (1..64; at most
@@ -9,6 +9,7 @@ values (1..Long.MAX_VALUE) within this local DB; do not mix IDs between DBs. Met
 
 | Method | JSON contract |
 |---|---|
+| scan(root, options) | Optional streaming local ingestion; stat/hash reuse, bounded batches and directory shards. [Contract](SCAN.md) |
 | item_upsert(identity, fields) | identity `{id:"opaque",aliases:[{kind,namespace,value}]}`; aliases optional, max64. Fields free-form except item/revision/identity/stages/observation/tombstone. Content-hash changes advance revision. Returns `{status,item,revision}` |
 | alias_add/remove(item, alias) | `{kind,namespace,value}`; collision/removal by wrong owner returns conflict |
 | observe(item, observation) | hash, size, mtime/mtime_ns, present, algorithm, ctime, file_id. Hash/stat changes advance revision; explicit present:false records absence |
@@ -37,7 +38,7 @@ instruction_digest(instruction_json), unconfirmed(plan,results,output). These
 perform local file I/O only. CLI --request/--query expose the same local primitive
 for diagnostics/tests; test-only --hold-lock is not a background daemon.
 
-Deferred 1C: arbitrary indexed attribute/hash/time/group queries, local tree scan,
+Deferred 1C: arbitrary indexed attribute/hash/time/group queries,
 full event change-cursor API/checkpoints/archive management, multi-process owner
 mailbox, large-tier index/codec qualification and raw file download/provider gaps.
 No stub functions claim to implement those capabilities.
@@ -48,8 +49,8 @@ import rejects oversized lines, missing footer and checksum failures.
 
 ## 0.1.1 compatibility and precision
 
-DB format2 adds alias-family interning and implicit self-success summaries; the
-logical query API remains unchanged. Format1 DBs receive an automatic backed-up upgrade; legacy snapshot inputs are
+DB format3 adds compact event frames; format2 introduced alias-family interning and implicit self-success summaries. The
+logical query API remains unchanged. Format1/2 DBs receive an automatic backed-up upgrade; legacy snapshot inputs are
 left untouched during transactional import: [details](FORMAT_UPGRADE.md).
 
 Claims return owner_generation, clock_era and fixed deadline_wall_ms/deadline_ms
