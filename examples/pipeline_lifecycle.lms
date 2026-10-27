@@ -1,0 +1,83 @@
+# One job: real loopback lmcurl -> local clean -> deterministic fake S3 executor.
+# Optional fail-fetch / fail-clean / fail-publish halts after the effect, before its receipt.
+let MODE = ARGV.len() > 0 ? ARGV[0] : "normal";
+let ROOT = ".lmfiles-local/pipeline";
+mkdir(ROOT); mkdir(ROOT+"/fake-s3"); mkdir("build"); mkdir("images");
+let DB = ROOT+"/state.mv"; let PLAN=ROOT+"/plan.jsonl"; let LOG=ROOT+"/results.jsonl";
+fn execute(p, name) {
+  let path="build/pipeline-"+name+".dslb"; savedsl(p,path);
+  let r=system(concat(dsl_cli(p),["--dsl",path]),30000); assert(r.code==0);
+}
+let LOGS=file_exists(PLAN)&&file_exists(LOG);
+let init=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
+let db=registry.open(${DB},"pipeline","{}");
+if (${LOGS}) { db.apply_records(${PLAN},${LOG},"{}"); }
+file_write(${ROOT+"/item.json"},db.item_upsert("{\"id\":\"synthetic-law\"}","{}"));
+db.close();
+end _lmcode_
+execute(init,"init");
+let item=read_json(ROOT+"/item.json"); let ITEM=item.item; let REV=item.revision;
+let counts=[];
+for (stage in ["fetched","cleaned","published"]) {
+  let selector=json_stringify({stage:stage,namespace:"pipeline",projection:"last_success"});
+  let query=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
+let db=registry.open(${DB},"pipeline","{}");
+let rows=db.query_subset("pipeline",${json_stringify([ITEM])},${selector});
+file_write(${ROOT+"/query.json"},rows.next_json(1,1048576)); rows.close(); db.close();
+end _lmcode_
+  execute(query,"query");
+  let row=read_json(ROOT+"/query.json")[0];
+  # Stage selection is script policy, never a built-in registry pipeline.
+  let done=row.get("recorded",{}).get("status","")=="ok" && row.recorded.get("source_revision","")==REV;
+  let count=0;
+  if (!done) {
+    let destination=stage=="fetched" ? ROOT+"/fetched.txt" : (stage=="cleaned" ? ROOT+"/cleaned.txt" : ROOT+"/fake-s3/law.txt");
+    let instruction={v:1,kind:"instruction",job:"pipeline",op:stage+"-"+ITEM+"-"+REV,payload:{verb:stage,item:ITEM,stage:stage,target:"pipeline",source_revision:REV,record_projection:"record",args:{path:destination}}};
+    let LINE=json_stringify(instruction);
+    let prepare=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
+registry.log_append(${PLAN},${LINE},"{}");
+file_write(${ROOT+"/digest.txt"},registry.instruction_digest(${LINE}));
+end _lmcode_
+    execute(prepare,"prepare");
+    if (stage=="fetched") {
+      let fetch=_lmcode_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
+let site=curl.mock();
+let r=curl.session(site.url()).get("/json").proxy("").timeout(3000).limit(1048576).send();
+assert_eq(r.status(),200); assert_eq(r.json("$.name").value(),"lmcurl");
+r.save(${destination}); site.stop();
+end _lmcode_
+      execute(fetch,"fetch");
+    } else if (stage=="cleaned") {
+      let cleaned=trim(read_file(ROOT+"/fetched.txt"))+"\n";
+      assert(write_file(destination,cleaned));
+    } else {
+      # Local fake S3-like executor: confirmed only after exact bytes are durable locally.
+      assert(copy_file(ROOT+"/cleaned.txt",destination));
+      assert(read_file(destination)==read_file(ROOT+"/cleaned.txt"));
+    }
+    if (MODE=="fail-"+(stage=="fetched"?"fetch":(stage=="cleaned"?"clean":"publish"))) {
+      assert(false,"synthetic crash after "+stage+" effect before receipt");
+    }
+    let body=read_file(destination);
+    let projection={kind:"record",item:ITEM,stage:stage,target:"pipeline",status:"ok",source_revision:REV,metadata:{path:destination,sha256:sha256(body),size:str(body.len()),synthetic:true}};
+    let RECEIPT=json_stringify({v:1,kind:"result",job:"pipeline",op:instruction.op,result_id:instruction.op+"-confirmed",completes_instruction:true,payload:{instruction_digest:read_file(ROOT+"/digest.txt"),confirmed:true,projection:projection}});
+    let record=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
+registry.log_append(${LOG},${RECEIPT},"{}");
+let db=registry.open(${DB},"pipeline","{}"); db.apply_records(${PLAN},${LOG},"{}"); db.close();
+end _lmcode_
+    execute(record,"record"); count=1;
+  }
+  counts=concat(counts,[count]);
+}
+let finish=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
+registry.unconfirmed(${PLAN},${LOG},${ROOT+"/unconfirmed.jsonl"});
+end _lmcode_
+execute(finish,"finish");
+write_json(ROOT+"/report.json",{fetched:counts[0],cleaned:counts[1],published:counts[2],cloud_requests:0,mode:MODE});
+let DATA="fetched "+str(counts[0])+"\ncleaned "+str(counts[1])+"\npublished "+str(counts[2])+"\n";
+let plot=_lmcode_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+plot.png("images/pipeline_lifecycle.png",900,520); plot.data("STAGES",${DATA});
+plot.cmd("set title 'Local lifecycle: only confirmed results advance stages'; set yrange [0:1.5]; set style data histograms; set style fill solid 0.75; plot $STAGES using 2:xtic(1) notitle"); plot.close();
+end _lmcode_
+execute(plot,"plot");
+println("estimated cost: $0.00 (loopback HTTP and local fake S3 only)");

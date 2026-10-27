@@ -12,6 +12,13 @@ A local file lifecycle registry. Your LMScript owns the job; existing hosts own 
 | ![Worker claims](docs/images/claims.png) | ![Plan and result replay](docs/images/journal_resume.png) | ![Stable snapshot](docs/images/snapshots.png) |
 | Two workers claim three items each, leaving four available. [Example](examples/claims.lms)<br>`lmctl https://raw.githubusercontent.com/lmctl-ai/lmfiles/main/examples/claims.lms` | One confirmed result out of two intents; duplicate replay does not repeat the state change. [Example](examples/journal_resume.lms)<br>`lmctl https://raw.githubusercontent.com/lmctl-ai/lmfiles/main/examples/journal_resume.lms` | A snapshot retains ten items after the current registry grows to fifteen. [Example](examples/snapshots.lms)<br>`lmctl https://raw.githubusercontent.com/lmctl-ai/lmfiles/main/examples/snapshots.lms` |
 
+![Download, clean and local fake publication](docs/images/pipeline_lifecycle.png)
+
+One script combines real loopback lmcurl with local cleanup and a fake S3-like
+executor. Confirmed journal receipts advance each user-defined stage. Rerun after
+`fail-fetch`, `fail-clean` or `fail-publish` to recover the confirmation gap.
+`lmctl https://raw.githubusercontent.com/lmctl-ai/lmfiles/main/examples/pipeline_lifecycle.lms`
+
 ## Build and run
 
 Version **0.1.0 is released**. Current main targets **0.1.1**; this patch is

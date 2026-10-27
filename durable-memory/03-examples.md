@@ -12,3 +12,9 @@ bucket and writes confirmed receipts only after its synthetic actions succeed.
 
 examples/render-all.sh regenerates docs/images. Gallery captions use the short
 lmctl URL.lms form. Tests run in fresh temp directories, not against user files.
+
+`pipeline_lifecycle.lms` uses real lmcurl against its loopback mock, local cleanup,
+and a persistent local fake S3-like executor. No AWS host or credentials are
+needed. `scripts/test-pipeline.py` checks all three effect-before-confirmation
+interruptions, replay, bytes and a second no-op (12 checks); `--gallery` renders
+its README picture. Explicit hosts install from `github:lmctl-ai/<name>@latest`.
