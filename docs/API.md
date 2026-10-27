@@ -49,8 +49,8 @@ import rejects oversized lines, missing footer and checksum failures.
 ## 0.1.1 compatibility and precision
 
 DB format2 adds alias-family interning and implicit self-success summaries; the
-logical query API remains unchanged. Format1 DBs/snapshots are preserved through
-an automatic backed-up upgrade: [details](FORMAT_UPGRADE.md).
+logical query API remains unchanged. Format1 DBs receive an automatic backed-up upgrade; legacy snapshot inputs are
+left untouched during transactional import: [details](FORMAT_UPGRADE.md).
 
 Claims return owner_generation, clock_era and fixed deadline_wall_ms/deadline_ms
 strings. Reopen does not renew; an expired/reclaimed token cannot complete.

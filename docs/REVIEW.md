@@ -80,7 +80,7 @@ During this review, **7 clearly-wrong small bugs were fixed directly** with 12 n
 - **Problem**: `PlanLog.unconfirmed()` writes unconfirmed instructions to `temp` by calling `append(temp, J.str(m), "{}")` per line (`PlanLog.java:154`), which opens, locks, writes, and `force(true)`s `temp` on every line before calling `channel.force(true)` again at the end (`PlanLog.java:156`) and atomically renaming `temp` to `target`. Also, `target.getParent()` directory is not `fsync`ed after `Files.move`.
 - **Recommendation**: Write all unconfirmed lines through a single buffered stream/channel on `temp`, `force(true)` `temp` once before `Files.move`, and `force(true)` the parent directory channel on POSIX platforms.
 
-#### 13. [LOW — Open] Post-release documentation drift on `v0.1.0` tag status (`README.md:17-18`, `examples/publish_ttl.lms:1`, `durable-memory/02-build-test.md:11,17`)
+#### 13. [LOW — Fixed in 0.1.1] Post-release documentation drift on `v0.1.0` tag status (`README.md:17-18`, `examples/publish_ttl.lms:1`, `durable-memory/02-build-test.md:11,17`)
 - **Problem**: Tag `v0.1.0` (`9e6212b`) and commit `95b7389` (`install="github:lmctl-ai/lmfiles@latest"`) are published on `main`, but `README.md:17-18` and `examples/publish_ttl.lms:1` still state *"This is the unreleased 0.1.0 development implementation... No release/tag has been published."*
 
 ---
@@ -154,7 +154,7 @@ are honored and an inferably future-issued legacy grant is fenced. The exact
 clock assumptions and non-remote guarantees are in [LEASES.md](LEASES.md).
 
 Regression coverage keeps the review's existing63 core/17 journal assertions and
-adds23 fake-clock,18 focused-review and20 format-upgrade assertions. The process
+adds23 fake-clock,22 focused-review and22 format-upgrade assertions. The process
 harness adds a kill after expiry retirement and before/after format replacement,
 then reopens the SAME DB and verifies fencing/data preservation. Existing nine
 fault points remain. Root-context errors and both memory-budget tests run in DSL.
@@ -176,3 +176,8 @@ retention/pinned-snapshot preservation is tested; immediate physical shrink is
 not promised. Storage comparisons above do not depend on compaction behavior.
 
 No AWS/admin command, tag, release or CI dispatch is part of this fix task.
+
+Final Linux managed/native gates pass:63 core,17 journal,23 lease,22 review and22
+upgrade assertions, plus21 subprocess checks covering12 fault points. The new
+review tests include exact registered-callback budgets for one next_json charge
+and materialized row charging. No AWS/admin commands or new tag/release.

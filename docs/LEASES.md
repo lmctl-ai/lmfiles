@@ -39,3 +39,8 @@ coordination primitives, not stage-age rules or an automatic job scheduler.
 `--lease-test DIR` uses an injectable in-process fake clock (no production time
 override). The process gate kills immediately after durable expiry retirement,
 then reopens, reclaims, and rejects the old holder before completing the new one.
+
+Claimed workflows must report through `complete(token,...)`. Direct stage_record
+and generic journal record projections are unclaimed reporting primitives; they
+do not authenticate ownership. A script must not use them as a substitute for
+fenced completion when it requires claims.

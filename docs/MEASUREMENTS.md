@@ -103,7 +103,7 @@ variance means one run is not a statistical throughput comparison.
 
 Format2 migration/backup/rollback behavior is in [FORMAT_UPGRADE.md](FORMAT_UPGRADE.md),
 and clock/fencing behavior in [LEASES.md](LEASES.md). The patch's Linux gates add
-23 deterministic fake-clock assertions,20 format-upgrade assertions,18 review
+23 deterministic fake-clock assertions,22 format-upgrade assertions,22 review
 regressions and21 subprocess checks (12 fault points), alongside63 core and17
 journal assertions. The previously recorded five-platform CI is for0.1.0; no CI,
 tag or release is dispatched by this patch. No AWS/admin command was run.

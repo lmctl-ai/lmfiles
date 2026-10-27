@@ -17,3 +17,8 @@ Code:a8ebebb7fa26f732ffc669e3191dc5b988257d2d. No Windows stub is needed.
 The five-platform evidence above is for0.1.0. v0.1.1 is qualified locally on
 Linux by this task; no new tag/release or CI dispatch is made. Lead releases. Local native final gate also ran all six
 gallery jobs and six publication scenarios with real cloud request count0.
+
+0.1.1 Linux gate:63 core/17 journal/23 lease/22 review/22 upgrade assertions;
+21 subprocess checks/12 fault points, both JVM and native, plus address-space
+and memory limits. See docs/measurements-0.1.1.json. No AWS/admin invocation,
+CI dispatch, tag or release in this patch task.

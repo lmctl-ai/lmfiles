@@ -114,6 +114,24 @@ public final class ReviewChecks {
             catch (Exception e) { throw new IllegalArgumentException(e); }
         }, "null path tag");
 
+        // Exercise the registered callbacks with exact budgets: charge one string,
+        // and charge each materialized row in addition to its opaque handle.
+        try(DslHost host=new DslHost()){
+            var ctx=new io.lmctl.lmcode.Context();String expected=J.str(List.of(Map.of("value","x")));ctx.memoryLimitBytes=expected.length()*2L+32;
+            try(Store.Cursor cursor=new Store.Cursor(List.of(Map.of("value","x")).iterator(),null)){
+                var binding=host.registry().resolve("method Cursor.next_json(int, int) -> string");
+                var value=binding.callback.call(ctx,io.lmctl.lmcode.Value.object("Cursor",cursor),new io.lmctl.lmcode.Value[]{io.lmctl.lmcode.Value.ofInt(1),io.lmctl.lmcode.Value.ofInt(1024)});
+                ok(value.asString().toString().equals(expected),"next_json is not double charged");
+                try{ctx.charge(1);throw new AssertionError("next_json was not charged");}catch(io.lmctl.lmcode.VmException exhausted){checks++;}
+            }
+            var rowContext=new io.lmctl.lmcode.Context();rowContext.memoryLimitBytes=64+2*64;
+            try(Store.Cursor cursor=new Store.Cursor(List.of(Map.of("value","a"),Map.of("value","b")).iterator(),null)){
+                var binding=host.registry().resolve("method Cursor.rows(int, int) -> Rows");
+                var value=binding.callback.call(rowContext,io.lmctl.lmcode.Value.object("Cursor",cursor),new io.lmctl.lmcode.Value[]{io.lmctl.lmcode.Value.ofInt(2),io.lmctl.lmcode.Value.ofInt(1024)});
+                ok(((Store.Rows)value.asObject()).len()==2,"materialized rows available within exact budget");
+                try{rowContext.charge(1);throw new AssertionError("row materialization was not charged");}catch(io.lmctl.lmcode.VmException exhausted){checks++;}
+            }
+        }
         return checks;
     }
 }

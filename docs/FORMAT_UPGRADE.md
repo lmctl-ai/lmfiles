@@ -24,7 +24,9 @@ When0.1.1 opens a format1 DB, it holds the existing exclusive writer lock and:
 The upgrader never resets an existing DB, overwrites a previous backup or fabricates
 history. Item IDs, metadata, events, frontiers, replay markers and claims are
 preserved. Ordinary failures before replacement leave format1 intact; the backup
-is retained after success. Unsupported atomic replacement/fsync fails explicitly.
+is retained after success. Atomic replacement/file-sync failures fail explicitly. Directory sync is strict
+on POSIX and uses the platform provider where available on Windows. Nonempty
+unversioned registries are rejected, never silently initialized or reset.
 Do not directly open the DB with another writer during upgrade.
 
 The0.1.0 binary refuses format2 (`unsupported-registry-format`). To roll back,

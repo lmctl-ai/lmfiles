@@ -55,7 +55,7 @@ public final class Store implements AutoCloseable {
             meta=db.openMap("meta");differences=db.openMap("differences");frontier=db.openMap("frontier");
             claims=db.openMap("claims");activeClaims=db.openMap("active_claims");replay=db.openMap("replay");dictionary=db.openMap("dictionary");
             aliasFamilies=db.openMap("alias_families");claimFences=db.openMap("claim_fences");
-            if(!meta.containsKey("format")){meta.put("format",StorageFormat.CURRENT);meta.put("epoch",UUID.randomUUID().toString());meta.put("next_item","0");meta.put("next_event","0");meta.put("next_dict","0");meta.put("next_fence","0");durable();}
+            if(!meta.containsKey("format")){if(!items.isEmpty()||!events.isEmpty()||!aliases.isEmpty()||!claims.isEmpty()||!differences.isEmpty())throw new IllegalStateException("unversioned-registry-is-not-empty");meta.put("format",StorageFormat.CURRENT);meta.put("epoch",UUID.randomUUID().toString());meta.put("next_item","0");meta.put("next_event","0");meta.put("next_dict","0");meta.put("next_fence","0");durable();}
             if(!StorageFormat.CURRENT.equals(meta.get("format")))throw new IllegalStateException("unsupported-registry-format");
             clockOwnerGeneration=0;
             clockAnchorEra=Long.parseLong(meta.getOrDefault("lease_clock_era","1"));
@@ -79,7 +79,7 @@ public final class Store implements AutoCloseable {
     private String mutate(Supplier<String> action){check();boolean registered=leaseOwnerRegistered;long owner=clockOwnerGeneration,era=clockAnchorEra,millis=clockAnchorMillis,nanos=clockAnchorNanos;try{String r=action.get();durable();return r;}catch(RuntimeException|Error e){db.rollback();leaseOwnerRegistered=registered;clockOwnerGeneration=owner;clockAnchorEra=era;clockAnchorMillis=millis;clockAnchorNanos=nanos;throw e;}}
     private Map<String,Object> row(String id){byte[] b=items.get(id(id));if(b==null)throw new IllegalArgumentException("unknown-item");return decode(b);}
     private static long id(String s){try{long id=Long.parseLong(s);if(id<=0)throw new NumberFormatException();return id;}catch(NumberFormatException e){throw new IllegalArgumentException("invalid-item-id");}}
-    private void save(String id,Map<String,Object> r){items.put(id(id),encode(r));}
+    private void save(String id,Map<String,Object> r){StorageFormat.elide(r);items.put(id(id),encode(r));}
     private String aliasKey(Map<String,Object> a,boolean create){keys(a,"kind","namespace","value");String kind=required(text(a,"kind"),"alias kind");if("identity".equals(kind))throw new IllegalArgumentException("reserved-alias-kind");return StorageFormat.aliasKey(kind,required(text(a,"namespace"),"alias namespace"),Objects.requireNonNull(a.get("value"),"alias value"),aliasFamilies,meta,create);}
     private String stageId(String stage,String ns,String slot,boolean create){String k=json(List.of(required(stage,"stage"),required(ns,"namespace"),slot));String d=dictionary.get(k);if(d==null&&create){d=Long.toString(next("next_dict"));dictionary.put(k,d);meta.put("dict:"+d,k);}return d;}
     private static Map<String,Object> stages(Map<String,Object> row){return map(row.computeIfAbsent("stages",k->new TreeMap<String,Object>()));}

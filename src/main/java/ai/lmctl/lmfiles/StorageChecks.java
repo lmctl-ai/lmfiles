@@ -97,11 +97,12 @@ public final class StorageChecks {
             String implicit = query(store, "[\"1\"]", "{\"stage\":\"published\",\"namespace\":\"site\",\"projection\":\"last_success\"}");
             ok("2".equals(recorded(implicit,"source_revision"))&&"ok".equals(recorded(implicit,"status")), "equal last-success elided as implicit latest success");
             ok("1".equals(J.text(object(store.call("item_upsert","{\"id\":\"case\"}","{}")),"item","")),"primary identity preserved");
+            store.call("stage_record","1","{\"stage\":\"published\",\"namespace\":\"site\",\"status\":\"ok\",\"source_revision\":\"1\"}");
         }
         try(MVStore raw=new MVStore.Builder().fileName(db.toString()).readOnly().open()){
             Map<String,Object> physical=Store.decode(raw.<Long,byte[]>openMap("items").get(1L));
             Map<String,Object> summaries=io.lmctl.lmcode.Json.object(physical.get("stages"));
-            ok(!io.lmctl.lmcode.Json.object(summaries.get("1")).containsKey("last_success"),"equal success elided on disk");
+            ok(!io.lmctl.lmcode.Json.object(summaries.get("1")).containsKey("last_success"),"equal success stays elided after late older receipt");
             ok(io.lmctl.lmcode.Json.object(summaries.get("2")).containsKey("last_success"),"distinct success retained on disk");
             ok(raw.getMapNames().contains("alias_families"),"family dictionary persisted");
         }
@@ -136,6 +137,10 @@ public final class StorageChecks {
         try { new Store(bad, "legacy", "{}"); throw new AssertionError("unknown map accepted"); }
         catch (IllegalStateException expected) { assertions++; }
         ok("1".equals(readMeta(bad, "format")), "failed upgrade leaves original format 1");
+        Path missingVersion=root.resolve("missing-version.mv");createLegacy(missingVersion);
+        try(MVStore raw=MVStore.open(missingVersion.toString())){raw.<String,String>openMap("meta").remove("format");raw.commit();raw.sync();}
+        try{new Store(missingVersion,"legacy","{}");throw new AssertionError("unversioned data reset");}catch(IllegalStateException expected){assertions++;}
+        ok(readMeta(missingVersion,"format")==null,"missing format not silently initialized over existing rows");
         return assertions;
     }
 
