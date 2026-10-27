@@ -69,13 +69,13 @@ if (( native == 1 )) && command -v readelf >/dev/null 2>&1; then
 fi
 
 # The actual VM allocation budget must stop a growing list, not only validate env.
-cat > "$fixture/memory.lms" <<EOF
-let p = _lmcode_ schema="$PWD/schema/lmfiles.dsl.json";
-let values = str_list();
-for (i in range(0,10000)) { values.add("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"); }
-end _lmcode_
-savedsl(p,"$fixture/memory.dslb");
-EOF
+python3 - "$fixture" <<'PYMEMORY'
+import json,sys
+from pathlib import Path
+work=Path(sys.argv[1]);schema=(Path.cwd()/'schema/lmfiles.dsl.json').as_posix()
+program='let p = _lmcode_ schema='+json.dumps(schema)+';\nlet values = str_list();\nfor (i in range(0,10000)) { values.add("'+'x'*128+'"); }\nend _lmcode_\nsavedsl(p,'+json.dumps((work/'memory.dslb').as_posix())+');\n'
+(work/'memory.lms').write_text(program,encoding='utf-8')
+PYMEMORY
 run 30 lmscript "$fixture/memory.lms"
 if LMFILES_MAX_MEMORY_MB=1 "${host[@]}" --dsl "$fixture/memory.dslb" >"$fixture/memory.json" 2>"$fixture/memory.err"; then
   echo 'runaway allocation was accepted' >&2; exit 1

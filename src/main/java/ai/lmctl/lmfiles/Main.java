@@ -16,7 +16,7 @@ public final class Main {
     switch(args[0]){
       case "--version"-> {System.out.println("lmfiles "+VERSION);return 0;}
       case "--dsl-schema"-> {System.out.print(HostApi.schema());return 0;}
-      case "--dsl-signatures"-> {try(DslHost h=new DslHost()){System.out.println(String.join("\n",h.registry().signatures()));}return 0;}
+      case "--dsl-signatures"-> {try(DslHost h=new DslHost()){System.out.print(String.join("\n",h.registry().signatures())+"\n");}return 0;}
       case "--notices"-> {try(var in=Main.class.getResourceAsStream("/THIRD_PARTY_NOTICES")){if(in==null)throw new IllegalStateException("missing embedded THIRD_PARTY_NOTICES");in.transferTo(System.out);}return 0;}
       case "--self-test"-> {Path p=args.length>1?Path.of(args[1]):Files.createTempDirectory("lmfiles-selftest-");System.out.println(J.str(Map.of("ok",true,"assertions",CoreChecks.run(p))));return 0;}
       case "--dsl"->{Path b=null;boolean dry=false;for(int i=1;i<args.length;i++){if(args[i].equals("--dry-run"))dry=true;else if(b==null)b=Path.of(args[i]);else throw new IllegalArgumentException("usage: --dsl BYTECODE [--dry-run]");}if(b==null)throw new IllegalArgumentException("--dsl requires bytecode");try(DslHost h=new DslHost()){return h.run(b,dry);}}
