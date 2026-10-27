@@ -11,8 +11,14 @@ Positional I/O only; no mmap, JNI/native database component or C++ sidecar.
 One writer OS lock. Each mutation/batch syncs before acknowledgment; failed
 operations roll back. Sparse caller-declared differences update in the same
 transaction and enumerate pending entries only. Leases use monotonic owner time,
-persist duration, and conservatively restart that duration after reopen.
+persist fixed absolute deadlines and ownership generations across reopen.
+Observed backward clock steps fence prior eras; monotonic elapsed time covers
+a live owner when wall time stalls. See docs/LEASES.md.
 Tokens fence local completion. Scripts decide actions and report actual revisions.
 
 Exact API: docs/API.md and generated schema. Default memory budget256MiB;
 bounded records/pages/batches, VM charges and H2 cache limits, not an exact RSS cap.
+
+Format2 interns alias kind/namespace pairs and elides self-equal last_success.
+Logical views preserve previous successful attempts. v0.1.0 format1 DBs upgrade
+through a synced shadow and retained backup; never reset in place.

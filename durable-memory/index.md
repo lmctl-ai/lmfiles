@@ -8,3 +8,6 @@
 - [../docs/JOURNAL.md](../docs/JOURNAL.md): optional plan/result codec and confirmation gap.
 - [../docs/MEASUREMENTS.md](../docs/MEASUREMENTS.md): measured size/latency/test evidence.
 - [../docs/measurements.json](../docs/measurements.json): synthetic local measurements and exact native digest.
+- [../docs/LEASES.md](../docs/LEASES.md):0.1.1 fixed deadlines, clock eras and generation fencing.
+- [../docs/FORMAT_UPGRADE.md](../docs/FORMAT_UPGRADE.md):released format1 to2 backup, migration and rollback contract.
+- [../docs/measurements-0.1.1.json](../docs/measurements-0.1.1.json): comparable format1/format2 10k storage results and patch gate counts.

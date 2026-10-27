@@ -33,7 +33,7 @@ During this review, **7 clearly-wrong small bugs were fixed directly** with 12 n
 - **Problem**: `Store.upsert()` (`Store.java:113`) stores the primary `(namespace, identity.id) -> item` mapping in the `aliases` MVMap under `json(List.of("identity", namespace, external))`. `Store.aliasKey()` (`Store.java:73`) encoded user aliases into the same `aliases` map as `json(List.of(kind, namespace, value))` without reserving `"identity"`. A caller invoking `alias_remove(item, {"kind": "identity", "namespace": ns, "value": id})` could delete an item's primary identity lookup (causing the next `item_upsert` for `id` to allocate a duplicate item number), or hijack another `identity.id` via `alias_add`.
 - **Fix applied**: Reserved `"identity"` in `Store.aliasKey()` (`Store.java:73`, throwing `IllegalArgumentException("reserved-alias-kind")`). Covered by `CoreChecks.java:36`.
 
-#### 4. [HIGH — Open / Design Tradeoff] Persisted claim leases reset their full `lease_ms` timer on every `Store` open across short-lived CLI/script invocations (`Store.java:28-29`, `Store.java:166-172`)
+#### 4. [HIGH — Fixed in 0.1.1] Persisted claim leases reset their full `lease_ms` timer on every `Store` open across short-lived CLI/script invocations (`Store.java:28-29`, `Store.java:166-172`)
 - **Problem**: Each `Store` instance generates an in-memory `ownerEpoch = UUID.randomUUID().toString()` and `ownerStarted = System.nanoTime()` (`Store.java:28-29`). For any claim created by a prior `Store` instance (`!ownerEpoch.equals(text(c, "owner_epoch"))`), `alive(token)` (`Store.java:172`) computes `deadline = ownerStarted + Long.parseLong(text(c, "lease_ms")) * 1_000_000`. Because `alive()` never persists the new `owner_epoch` back into the claim record on first reopen, and because `lmscript` executes each `_lmcode_ ... end _lmcode_` block (and each `--request` CLI call) in a fresh `Store` instance where `System.nanoTime() - ownerStarted` is only a few milliseconds, a claim created in one process **never expires** in subsequent short-lived processes unless a single `Store` instance remains open continuously for longer than `lease_ms`. Meanwhile, the wall-clock `"until"` field written to every claim record (`Store.java:167, 176`) is never read.
 - **Recommendation**: On `Store` open (or lazily on the first `alive()` check for an old-epoch claim), either bound reopened claims by `Math.min(until - System.currentTimeMillis(), lease_ms)` or persist the reopen timestamp/epoch transition so repeated short-lived `Store` opens do not perpetually restart the lease timer from zero.
 
@@ -142,3 +142,37 @@ During this review, **7 clearly-wrong small bugs were fixed directly** with 12 n
   - All 6 examples (`publish_ttl.lms`, `frontier.lms`, `revisions.lms`, `claims.lms`, `journal_resume.lms`, `snapshots.lms`) execute real `_lmcode_` bytecode against `lmfiles` and plot real outputs with `lmplot`.
   - In `examples/publish_ttl.lms` (verified across 6 sequential runs by `scripts/test-publication.py`), the `"uncertain"` mode (Run 3) modifies `law-a`, appends the `put` instruction to `plan.jsonl`, executes the synthetic transfer (`aws.demo()` + writing `fake-bucket/law-a.html`), and deliberately omits appending the receipt to `results.jsonl`. `apply_records` therefore leaves `law-a`'s recorded `published` stage at revision 1 while `unconfirmed` writes the 1 unconfirmed instruction to `unconfirmed.jsonl`. On Run 4 (`"changed"`), `publish_ttl.lms` replays any prior confirmed receipts before upserting items, queries `query_subset`, sees `law-a` is still `"changed"` relative to revision 1, re-transfers `law-a`, writes the confirmation receipt, and converges to `selected=0` on Run 5.
   - **One subtlety to note in `publish_ttl.lms`**: Run 4 re-identifies the unconfirmed item via `query_subset` (`state != "same-as-recorded"`) and truncates `plan.jsonl`/`results.jsonl` at line 31 after calling `apply_records` at line 17, rather than reading `unconfirmed.jsonl` as an input queue. That is completely truthful to the registry model (since unconfirmed transfers never advanced the registry's `last_success` projection, `query_subset` naturally re-selects them), while `unconfirmed.jsonl` serves as an explicit audit artifact of interrupted intents.
+
+
+## 0.1.1 fix disposition
+
+Finding4 is fixed with persisted absolute wall/logical deadlines, a persisted
+clock era, and per-work-item owner generations. No reopen restarts lease_ms.
+Backward wall steps fence older eras; forward jumps can expire early; monotonic
+elapsed time covers a stalled wall clock inside an owner. Legacy until deadlines
+are honored and an inferably future-issued legacy grant is fenced. The exact
+clock assumptions and non-remote guarantees are in [LEASES.md](LEASES.md).
+
+Regression coverage keeps the review's existing63 core/17 journal assertions and
+adds23 fake-clock,18 focused-review and20 format-upgrade assertions. The process
+harness adds a kill after expiry retirement and before/after format replacement,
+then reopens the SAME DB and verifies fencing/data preservation. Existing nine
+fault points remain. Root-context errors and both memory-budget tests run in DSL.
+
+Both requested low-risk storage changes are implemented: interned alias families
+and omission of last_success only when equal to latest_attempt. Database format2
+and wire snapshot format2 are explicit; v0.1.0 data upgrades by a bounded shadow
+copy with a retained format1 backup. Unknown maps fail without being discarded.
+See [FORMAT_UPGRADE.md](FORMAT_UPGRADE.md) for upgrade/downgrade and old snapshots.
+The comparable10k profile drops1,508.5568 to1,473.3312 B/item (about2.34%).
+
+Finding10's supported workaround is now explicit in docs/API.md: use decimal
+strings for64-bit observation metadata; the SDK's numeric parser is unchanged.
+Finding13's stale release text is corrected:0.1.0 is released;0.1.1 awaits the Lead.
+Findings11/12 remain lower-priority SDK-arena credit/per-line-fsync work, outside
+this lease and storage patch. Reuse a Registry within a bounded host invocation;
+no cache-credit or fsync-admission guarantees were weakened here. Compaction
+retention/pinned-snapshot preservation is tested; immediate physical shrink is
+not promised. Storage comparisons above do not depend on compaction behavior.
+
+No AWS/admin command, tag, release or CI dispatch is part of this fix task.

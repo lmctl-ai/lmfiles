@@ -79,3 +79,31 @@ were uploaded; no tag or release was created. Linux reports18 process checks;
 macOS/Windows report17 because the optional Linux strace check is unavailable.
 The55 semantic and13 journal assertions pass on every target. Gallery and public
 URL execution evidence is the separate local Linux campaign above.
+
+
+## 0.1.1 reviewed patch: comparable storage experiment
+
+[Machine-readable result](measurements-0.1.1.json). Both runs use Java21,
+-Xmx256m, identical H2/SDK pins and the unchanged 10,000-item benchmark generator.
+The baseline is reviewed format1 (`f08f454`); the patch is format2. These are
+fresh **uncompacted physical files**, including normal MVStore retained pages.
+
+| Profile | Bytes | Bytes/item |
+|---|---:|---:|
+| Format1 before | 15,085,568 | 1,508.5568 |
+| Format2 after | 14,733,312 | 1,473.3312 |
+| Reduction | 352,256 | 35.2256 (2.335%) |
+
+Both have10,000 items,60,100 events and100 pending items; the frontier examines
+exactly100 entries. No audit records or metadata were dropped. Alias kind/namespace
+interning and self-success elision provide a modest physical reduction because
+existing compression already deduplicated much of the repeated data. This does
+not meet the750–1,050B target or qualify100M scale. Timestamp/page-compression
+variance means one run is not a statistical throughput comparison.
+
+Format2 migration/backup/rollback behavior is in [FORMAT_UPGRADE.md](FORMAT_UPGRADE.md),
+and clock/fencing behavior in [LEASES.md](LEASES.md). The patch's Linux gates add
+23 deterministic fake-clock assertions,20 format-upgrade assertions,18 review
+regressions and21 subprocess checks (12 fault points), alongside63 core and17
+journal assertions. The previously recorded five-platform CI is for0.1.0; no CI,
+tag or release is dispatched by this patch. No AWS/admin command was run.

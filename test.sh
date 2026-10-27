@@ -12,8 +12,8 @@ if [[ "${1:-}" == "--native" ]]; then native=1; shift; fi
 
 if (( native == 0 )); then
   [[ "${SKIP_BUILD:-0}" == 1 ]] || run 1800 mvn -q package
-  host=(java -jar target/lmfiles-0.1.0-all.jar)
-  [[ -f target/lmfiles-0.1.0-all.jar ]]
+  host=(java -jar target/lmfiles-0.1.1-all.jar)
+  [[ -f target/lmfiles-0.1.1-all.jar ]]
 else
   binary=target/lmfiles
   [[ ! -x target/lmfiles.exe ]] || binary=target/lmfiles.exe
@@ -30,7 +30,7 @@ python3 scripts/verify-deps.py
 "${host[@]}" --dsl-signatures > "$schema_tmp.signatures"
 lmscript --dsl-signatures "$schema_file" > "$schema_tmp.expected"
 diff -u "$schema_tmp.expected" "$schema_tmp.signatures"
-"${host[@]}" --version | grep -q '^lmfiles 0\.1\.0$'
+"${host[@]}" --version | grep -q '^lmfiles 0\.1\.1$'
 "${host[@]}" --notices | grep -q 'Lattice Systems LLC'
 
 fixture=$(mktemp -d "${TMPDIR:-/tmp}/lmfiles-gate.XXXXXX")
@@ -47,6 +47,11 @@ import json, pathlib, sys
 row=json.loads(pathlib.Path(sys.argv[1]).read_text().splitlines()[-1])
 assert row.get("ok") is True and int(row.get("assertions", 0)) >= 5
 PY
+
+# Deterministic fake-clock, review-fix and format-upgrade regressions run on JVM/native alike.
+run 120 "${host[@]}" --lease-test "$fixture/leases"
+run 120 "${host[@]}" --review-test "$fixture/review"
+run 120 "${host[@]}" --storage-test "$fixture/storage"
 
 # Fresh processes cover same-DB reopen, commit killpoints, lock ownership and
 # optional network syscall denial. The harness fails on missing request/lock APIs.
@@ -82,6 +87,20 @@ if LMFILES_MAX_MEMORY_MB=1 "${host[@]}" --dsl "$fixture/memory.dslb" >"$fixture/
 fi
 grep -q 'LMFILES_MAX_MEMORY_MB' "$fixture/memory.err"
 grep -q 'false' "$fixture/memory.json"
+
+python3 - "$fixture" <<'PYROOT'
+import json,sys
+from pathlib import Path
+work=Path(sys.argv[1]);schema=(Path.cwd()/'schema/lmfiles.dsl.json').as_posix()
+source='let p = _lmcode_ schema='+json.dumps(schema)+';\nregistry.item_upsert("{}","{}");\nend _lmcode_\nsavedsl(p,'+json.dumps((work/'root.dslb').as_posix())+');\n'
+(work/'root.lms').write_text(source,encoding='utf-8')
+PYROOT
+run 30 lmscript "$fixture/root.lms"
+if "${host[@]}" --dsl "$fixture/root.dslb" >"$fixture/root.json"; then
+ echo 'root registry accepted an instance method' >&2; exit 1
+fi
+grep -q 'requires an open Registry handle' "$fixture/root.json"
+if grep -q 'ClassCastException' "$fixture/root.json"; then exit 1; fi
 
 # Per-store caches must also consume the same VM budget.
 python3 - "$fixture" <<'PYCACHES'

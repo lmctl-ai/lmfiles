@@ -27,3 +27,8 @@ its action. Retry/reconcile/idempotency is the script's decision. Claims fence l
 completion, not remote effects. --journal-test and the publication regression run
 exercise plan-only, durable-result replay, duplicate replay, torn tail, corruption,
 wrong digest, out-of-plan and oversized-path/error cases.
+
+Apply a sealed plan/result pair: callers must not replace or edit the input files
+during pre-validation and replay. Confirmed result IDs are pre-checked against
+persisted replay markers before any new result commits. Appending after a torn
+last line truncates only that unconfirmed tail under the writer lock.

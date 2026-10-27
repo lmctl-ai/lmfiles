@@ -126,6 +126,36 @@ def main() -> int:
         assert json.loads(call('--apply-records',str(receipt_db),str(plan_path),str(results_path)).stdout)['duplicates']==1
         passed+=1
 
+        # Persisted expiry survives separate owners and a crash after retirement.
+        lease_db=root/'lease.mv'
+        call('--request',str(lease_db),'item_upsert',identity,fields)
+        call('--request',str(lease_db),'stage_record','1',json.dumps({'stage':'fetched','namespace':'fixture','status':'ok','source_revision':'1'}))
+        fetched={'stage':'fetched','namespace':'fixture','status':'ok'}
+        cleaned={'stage':'cleaned','namespace':'fixture','status':'ok'}
+        call('--request',str(lease_db),'difference_index',json.dumps(fetched),json.dumps(cleaned),'{"id":"lease-frontier"}')
+        granted=json.loads(call('--request',str(lease_db),'claim','{"difference":"lease-frontier"}','lease-workers','1','300','first').stdout)[0]
+        time.sleep(0.35)
+        completed={'stage':'cleaned','namespace':'fixture','status':'ok','source_revision':'1'}
+        killed=call('--request',str(lease_db),'complete',granted['token'],json.dumps(completed),'1',env={'LMFILES_KILL_POINT':'after_claim_expiry'},check=False)
+        assert killed.returncode==77,killed.stderr
+        replacement=json.loads(call('--request',str(lease_db),'claim','{"difference":"lease-frontier"}','lease-workers','1','60000','replacement').stdout)[0]
+        assert int(replacement['owner_generation'])>int(granted['owner_generation'])
+        assert json.loads(call('--request',str(lease_db),'complete',granted['token'],json.dumps(completed),'1').stdout)['status']=='fenced-or-expired'
+        assert json.loads(call('--request',str(lease_db),'complete',replacement['token'],json.dumps(completed),'1').stdout)['status']=='ok'
+        passed+=1
+
+        # Both sides of the atomic format swap reopen with all old logical data.
+        for point in ('before_upgrade_swap','after_upgrade_swap'):
+            legacy=root/(point+'.mv');call('--make-v1-fixture',str(legacy))
+            killed=call('--request',str(legacy),'doctor',env={'LMFILES_KILL_POINT':point},check=False)
+            assert killed.returncode==77,killed.stderr
+            upgraded=json.loads(call('--request',str(legacy),'doctor').stdout)
+            assert upgraded['format']=='2' and upgraded['items']=='1' and upgraded['events']=='1',upgraded
+            assert list(root.glob(legacy.name+'.v1*.bak'))
+            rows=call('--query',str(legacy),'query_subset','legacy','[{"kind":"path","namespace":"local","value":{"base64":"/w=="}}]','{}').stdout
+            assert '"identity":"case"' in rows,rows
+            passed+=1
+
         # --hold-lock is an intentional test-only CLI operation. It keeps the
         # same Store open, proving the OS lock rather than racing a short request.
         holder_db = root / "lock.mv"

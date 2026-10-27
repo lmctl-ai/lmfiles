@@ -1,4 +1,4 @@
-# One local/fake publish job. Requires the unreleased lmfiles build on PATH.
+# One local/fake publish job. Installs the latest released lmfiles; a local build on PATH can test main.
 # No AWS profile, credentials, endpoints or subscription are used.
 # Optional arguments: changed (one new revision), uncertain (omit its receipt).
 let MODE = ARGV.len() > 0 ? ARGV[0] : "normal";

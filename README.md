@@ -14,11 +14,15 @@ A local file lifecycle registry. Your LMScript owns the job; existing hosts own 
 
 ## Build and run
 
-This is the **unreleased 0.1.0 development implementation of milestones 1A and 1B**.
-No release/tag has been published. Gallery commands require a locally built `lmfiles`
-on PATH, plus lmctl/lmscript, lmplot and (for publish_ttl) lmaws. All gallery data
-is synthetic; the publication example explicitly uses `aws.demo()` and a local
-fake bucket. It needs no credentials and performs no real cloud operation.
+Version **0.1.0 is released**. Current main targets **0.1.1**; this patch is
+not tagged or released by its implementer. README URLs install the published
+latest version. To exercise0.1.1 before the Lead publishes it, build locally and
+put that binary on PATH. lmplot supplies the pictures; publish_ttl additionally
+uses explicit lmaws demo mode. All example inputs are synthetic.
+
+Format1 databases from0.1.0 are automatically upgraded with a retained backup.
+Read [the upgrade/rollback contract](docs/FORMAT_UPGRADE.md) before opening an
+existing DB with0.1.1. There is no reset or silent deletion.
 
 ```sh
 mvn -q package                         # Java 21+; immutable SDK archive verified
@@ -83,10 +87,12 @@ an exact process RSS quota; native runtime/cache overhead is reported separately
 
 One process owns the writer OS lock. Every mutation/batch commits and syncs
 before acknowledgment; failed batches roll back together. CRC32C-protected,
-compressed binary item/event rows are co-located and stage IDs are interned.
+compressed binary item/event rows are co-located; stage IDs and alias families are interned. Equal latest/success
+summaries share one stored representation.
 Snapshots pin MVStore versions; queries stream bounded pages. Claims coordinate
-local workers, not remote exactly-once effects. Restart conservatively retains
-persisted leases for their full original duration to avoid clock-based stealing.
+local workers, not remote exactly-once effects. Fixed deadlines survive process reopen; persisted generations fence expired or
+replaced owners. A backward wall-clock step fences the prior clock era. See
+[lease semantics](docs/LEASES.md).
 
 Plans/results use canonical JSONL, CRC32C, instruction SHA-256, explicit item/stage/
 revision bindings, immutable result IDs and a 64 KiB line ceiling. Replay rejects

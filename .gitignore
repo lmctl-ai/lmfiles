@@ -15,3 +15,6 @@ __pycache__/
 *.mv
 *.mv.lock
 *.jsonl
+
+*.mv.v1*.bak
+*.upgrade-v2-*.tmp

@@ -1,0 +1,63 @@
+{
+  "baseline_commit": "f08f454",
+  "runtime": "Java 21 JVM, -Xmx256m, Linux x64",
+  "profile": "fresh uncompacted 10000 items; three explicit aliases plus identity, five stages, six events/item +100 pending updates",
+  "before": {
+    "build_seconds": 2.786419252,
+    "bytes_per_item": 1508.5568,
+    "disk_bytes": "15085568",
+    "doctor": {
+      "events": "60100",
+      "examined": "100",
+      "items": "10000",
+      "status": "ok",
+      "storage": "MVStore positional I/O, compressed CRC32C binary records"
+    },
+    "items": 10000,
+    "pending": 100,
+    "profile": "three explicit aliases plus identity index, five stages, six events/item before pending updates; compact synthetic metadata",
+    "reopen_query_ms": 2.641861,
+    "scope": "local measured workload, not 100M qualification",
+    "subset_queries": 1000,
+    "subset_query_ms": 34.401555
+  },
+  "after": {
+    "build_seconds": 2.540880709,
+    "bytes_per_item": 1473.3312,
+    "disk_bytes": "14733312",
+    "doctor": {
+      "alias_families": "4",
+      "events": "60100",
+      "examined": "100",
+      "format": "2",
+      "items": "10000",
+      "status": "ok",
+      "storage": "MVStore positional I/O, compressed CRC32C binary records"
+    },
+    "items": 10000,
+    "pending": 100,
+    "profile": "three explicit aliases plus identity index, five stages, six events/item before pending updates; compact synthetic metadata",
+    "reopen_query_ms": 2.979118,
+    "scope": "local measured workload, not 100M qualification",
+    "subset_queries": 1000,
+    "subset_query_ms": 31.822106
+  },
+  "saved_bytes_per_item": 35.225599999999986,
+  "saved_percent": 2.3350529459679596,
+  "native_and_managed_counts": {
+    "core": 63,
+    "journal": 17,
+    "lease": 23,
+    "review": 18,
+    "storage": 20,
+    "process": 21
+  },
+  "new_fault_points": [
+    "after_claim_expiry",
+    "before_upgrade_swap",
+    "after_upgrade_swap"
+  ],
+  "aws_commands_run": 0,
+  "admin_commands_run": 0,
+  "new_tag_or_release": false
+}

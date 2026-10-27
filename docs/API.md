@@ -45,3 +45,18 @@ No stub functions claim to implement those capabilities.
 Operational limits: individual decoded records <=1MiB and <=a quarter of the
 configured memory budget; batches <=16MiB and <=a quarter of budget. Snapshot
 import rejects oversized lines, missing footer and checksum failures.
+
+## 0.1.1 compatibility and precision
+
+DB format2 adds alias-family interning and implicit self-success summaries; the
+logical query API remains unchanged. Format1 DBs/snapshots are preserved through
+an automatic backed-up upgrade: [details](FORMAT_UPGRADE.md).
+
+Claims return owner_generation, clock_era and fixed deadline_wall_ms/deadline_ms
+strings. Reopen does not renew; an expired/reclaimed token cannot complete.
+Backward wall steps fence older eras: [semantics](LEASES.md).
+
+Pass `size`, `mtime_ns`, `ctime`, `file_id` and other64-bit integer metadata as
+**decimal strings**, as for item IDs/revisions. The pinned SDK1.1 JSON parser
+uses Double for JSON numeric tokens; values above2^53 can lose precision. The
+registry does not infer lost digits. This patch does not change that SDK.
