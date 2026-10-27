@@ -20,6 +20,7 @@ savedsl(state, "build/frontier-state.dslb");
 let run = system ${dsl_cli(state)} --dsl build/frontier-state.dslb;
 assert(run.code == 0);
 
+assert(read_file(".lmfiles-local/frontier/data.dat")=="fetched 20\npublished 14\npending 6\n");
 let plot = _lmcode_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
 plot.png("images/frontier.png", 820, 520);
 plot.cmd("set title 'Lifecycle frontier'; set ylabel 'items'; set style data histograms; set style fill solid 0.8; set datafile separator ' '; set yrange [0:*]; plot '.lmfiles-local/frontier/data.dat' using 2:xtic(1) title 'registry count'");

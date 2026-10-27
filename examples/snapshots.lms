@@ -11,14 +11,14 @@ let oldrows = old.rows(100, 1048576);
 let current_snap = db.snapshot();
 let current = current_snap.query("{\"all\":true}", "{}");
 let currentrows = current.rows(100, 1048576);
-file_write(".lmfiles-local/snapshots/data.dat", "snapshot 10\ncurrent " + str(currentrows.len()) + "\n");
+file_write(".lmfiles-local/snapshots/data.dat", "snapshot " + str(oldrows.len()) + "\ncurrent " + str(currentrows.len()) + "\n");
 old.close(); current.close(); current_snap.close(); snap.close(); db.close();
 end _lmcode_
 savedsl(state, "build/snapshots-state.dslb");
 let run = system ${dsl_cli(state)} --dsl build/snapshots-state.dslb;
 assert(run.code == 0);
-assert(run.code == 0);
 
+assert(read_file(".lmfiles-local/snapshots/data.dat")=="snapshot 10\ncurrent 15\n");
 let plot = _lmcode_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
 plot.png("images/snapshots.png", 820, 520);
 plot.cmd("set title 'Snapshot versus current registry'; set ylabel 'items'; set style data histograms; set style fill solid 0.8; set datafile separator ' '; set yrange [0:*]; plot '.lmfiles-local/snapshots/data.dat' using 2:xtic(1) title 'registry count'");
@@ -26,6 +26,4 @@ plot.close();
 end _lmcode_
 savedsl(plot, "build/snapshots-plot.dslb");
 let plotted = system ${dsl_cli(plot)} --dsl build/snapshots-plot.dslb;
-assert(plotted.code == 0);
-
 assert(plotted.code == 0);

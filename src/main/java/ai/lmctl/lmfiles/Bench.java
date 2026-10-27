@@ -33,16 +33,19 @@ public final class Bench {
                 batch.commit();
             }
         }
-        long buildNs=System.nanoTime()-start,queryNs;int pending=0;String doctor;
+        long buildNs=System.nanoTime()-start,queryNs,subsetNs;int subsetRows=0;int pending=0;String doctor;
         try(Store s=new Store(path,"benchmark","{}")) {
             long t=System.nanoTime();
             try(Store.Cursor c=s.query("stage_difference",a,b,J.str(Map.of("index",index,"require_index",true,"require_matching_source_revision",true)))) {
                 while(true){Object page=J.parse(c.nextJson(256,1048576));List<?> rows=(List<?>)page;if(rows.isEmpty())break;pending+=rows.size();}
             }
-            queryNs=System.nanoTime()-t;doctor=s.call("doctor","{}");
+            queryNs=System.nanoTime()-t;
+            long subsetStart=System.nanoTime();
+            for(int offset=0;offset<Math.min(count,1000);offset+=256){var ids=new ArrayList<String>();for(int n=offset;n<Math.min(Math.min(count,1000),offset+256);n++)ids.add(Integer.toString((int)((long)n*7919%count)+1));try(Store.Cursor c=s.query("query_subset","benchmark",J.str(ids),"{}")){while(true){List<?> rows=(List<?>)J.parse(c.nextJson(256,1048576));if(rows.isEmpty())break;subsetRows+=rows.size();}}}
+            subsetNs=System.nanoTime()-subsetStart;doctor=s.call("doctor","{}");
         }
         if(pending!=Math.max(1,count/100))throw new IllegalStateException("benchmark frontier wrong: "+pending);
         long bytes=Files.size(path);
-        return J.str(Map.of("profile","three explicit aliases plus identity index, five stages, six events/item before pending updates; compact synthetic metadata", "items",count,"disk_bytes",Long.toString(bytes),"bytes_per_item",(double)bytes/count,"build_seconds",buildNs/1e9,"pending",pending,"reopen_query_ms",queryNs/1e6,"doctor",J.parse(doctor),"scope","local measured workload, not 100M qualification"));
+        Map<String,Object> report=new LinkedHashMap<>();report.put("subset_queries",subsetRows);report.put("subset_query_ms",subsetNs/1e6);report.putAll(Map.of("profile","three explicit aliases plus identity index, five stages, six events/item before pending updates; compact synthetic metadata", "items",count,"disk_bytes",Long.toString(bytes),"bytes_per_item",(double)bytes/count,"build_seconds",buildNs/1e9,"pending",pending,"reopen_query_ms",queryNs/1e6,"doctor",J.parse(doctor),"scope","local measured workload, not 100M qualification"));return J.str(report);
     }
 }

@@ -17,6 +17,7 @@ public final class Store implements AutoCloseable {
     private final Path path;
     private final String namespace;
     private MVStore db;
+    private LmfilesFaultFileStore faultFile;
     private FileChannel lockChannel;
     private FileLock lock;
     private MVMap<Long,byte[]> items,events;
@@ -24,8 +25,8 @@ public final class Store implements AutoCloseable {
     private MVMap<String,String> meta,differences,frontier,claims,activeClaims,replay,dictionary;
     private boolean closed;
     private long examined;
-    private final Map<String,Long> deadlines=new HashMap<>();
-    private Map<String,Long> deadlineUndo;
+    private final String ownerEpoch=UUID.randomUUID().toString();
+    private final long ownerStarted=System.nanoTime();
     private final Set<Snapshot> snapshots=Collections.newSetFromMap(new IdentityHashMap<>());
 
     public Store(Path path,String namespace,String options) {
@@ -39,16 +40,19 @@ public final class Store implements AutoCloseable {
             try {lock=lockChannel.tryLock();}catch(OverlappingFileLockException e){throw new IllegalStateException("writer-busy");}
             if(lock==null)throw new IllegalStateException("writer-busy");
             // Default FileStore uses positional FileChannel I/O, never a mapped backend.
-            db=new MVStore.Builder().fileName(this.path.toString()).cacheSize((int)cache).compress().autoCommitDisabled().open();
+            String fault=System.getenv("LMFILES_KILL_POINT");
+            var builder=new MVStore.Builder().cacheSize((int)cache).compress().autoCommitDisabled();
+            if(Set.of("mid_commit","mid_compaction","disk_full").contains(fault==null?"":fault)){
+                faultFile=new LmfilesFaultFileStore(fault);faultFile.open(this.path.toString(),false,null);builder.fileStore(faultFile);
+            } else builder.fileName(this.path.toString());
+            db=builder.open();
             items=db.openMap("items");events=db.openMap("events");aliases=db.openMap("aliases");
             meta=db.openMap("meta");differences=db.openMap("differences");frontier=db.openMap("frontier");
             claims=db.openMap("claims");activeClaims=db.openMap("active_claims");replay=db.openMap("replay");dictionary=db.openMap("dictionary");
             if(!meta.containsKey("format")){meta.put("format","1");meta.put("epoch",UUID.randomUUID().toString());meta.put("next_item","0");meta.put("next_event","0");meta.put("next_dict","0");meta.put("next_fence","0");durable();}
             if(!"1".equals(meta.get("format")))throw new IllegalStateException("unsupported-registry-format");
-            // Restart cannot establish elapsed wall time. Conservatively retain every saved
-            // lease for its full original duration from this monotonic owner epoch.
-            for(var c:claims.entrySet()){long duration=Long.parseLong(J.text(J.obj(c.getValue()),"lease_ms","86400000"));deadlines.put(c.getKey(),System.nanoTime()+duration*1000000);}
-            // Old tokens remain fenced once replaced; wall-clock jumps never steal a lease.
+            // Old leases are evaluated lazily against this monotonic owner epoch;
+            // opening a large registry never loads every claim into RAM.
         } catch(Exception e){cleanup();throw new IllegalStateException("cannot-open-registry: "+e.getMessage(),e);}
     }
     private static String required(String s,String field){if(s==null||s.isEmpty()||s.indexOf('\0')>=0)throw new IllegalArgumentException(field+" required, without NUL");return s;}
@@ -61,10 +65,8 @@ public final class Store implements AutoCloseable {
     private void check(){if(closed)throw new IllegalStateException("registry-closed");}
     private long next(String field){long n=Math.addExact(Long.parseLong(meta.getOrDefault(field,"0")),1);meta.put(field,Long.toString(n));return n;}
     private static void kill(String point){if(point.equals(System.getenv("LMFILES_KILL_POINT")))Runtime.getRuntime().halt(77);}
-    private void durable(){kill("before_commit");db.commit();db.sync();kill("after_commit");}
-    private void deadlinePut(String key,long value){if(deadlineUndo!=null&&!deadlineUndo.containsKey(key))deadlineUndo.put(key,deadlines.get(key));deadlines.put(key,value);}
-    private void deadlineRemove(String key){if(deadlineUndo!=null&&!deadlineUndo.containsKey(key))deadlineUndo.put(key,deadlines.get(key));deadlines.remove(key);}
-    private String mutate(Supplier<String> action){check();deadlineUndo=new HashMap<>();try{String r=action.get();durable();return r;}catch(RuntimeException|Error e){db.rollback();for(var entry:deadlineUndo.entrySet())if(entry.getValue()==null)deadlines.remove(entry.getKey());else deadlines.put(entry.getKey(),entry.getValue());throw e;}finally{deadlineUndo=null;}}
+    private void durable(){kill("before_commit");if(faultFile!=null&&!faultFile.point.equals("mid_compaction"))faultFile.armed=true;db.commit();db.sync();kill("after_commit");}
+    private String mutate(Supplier<String> action){check();try{String r=action.get();durable();return r;}catch(RuntimeException|Error e){db.rollback();throw e;}}
     private Map<String,Object> row(String id){byte[] b=items.get(id(id));if(b==null)throw new IllegalArgumentException("unknown-item");return decode(b);}
     private static long id(String s){try{long id=Long.parseLong(s);if(id<=0)throw new NumberFormatException();return id;}catch(NumberFormatException e){throw new IllegalArgumentException("invalid-item-id");}}
     private void save(String id,Map<String,Object> r){items.put(id(id),encode(r));}
@@ -80,7 +82,7 @@ public final class Store implements AutoCloseable {
         if(op.equals("doctor"))return doctor();
         if(op.equals("replay_seen"))return json(Map.of("digest",replay.getOrDefault(a[0],"")));
         if(op.equals("export_records"))return export(Path.of(a[0]));
-        if(op.equals("compact")){kill("before_compaction");db.compactFile(1000);db.sync();kill("after_compaction");return ok();}
+        if(op.equals("compact")){kill("before_compaction");if(faultFile!=null){db.setRetentionTime(0);faultFile.armed=true;}db.compactFile(1000);db.sync();kill("after_compaction");return ok();}
         if(op.equals("stats"))return ok("examined",Long.toString(examined),"items",Long.toString(items.sizeAsLong()),"events",Long.toString(events.sizeAsLong()));
         if(op.equals("apply_records")){try{return PlanLog.apply(this,Path.of(a[0]),Path.of(a[1]));}catch(IOException e){throw new UncheckedIOException(e);}}
         return mutate(()->change(op,a));
@@ -122,7 +124,7 @@ public final class Store implements AutoCloseable {
         String rev=required(text(result,"source_revision"),"source_revision");if(Long.parseLong(rev)<1||Long.parseLong(rev)>Long.parseLong(text(r,"revision")))throw new IllegalArgumentException("invalid-source-revision");
         if(result.containsKey("last_success"))throw new IllegalArgumentException("read-only-last-success");
         String d=stageId(stage,ns,text(result,"slot"),true);var all=stages(r);Map<String,Object> prev=all.containsKey(d)?map(all.get(d)):Map.of();
-        var p=new LinkedHashMap<String,Object>(result);p.remove("stage");p.remove("namespace");p.remove("slot");
+        var p=new LinkedHashMap<String,Object>(result);p.remove("stage");p.remove("namespace");p.remove("slot");p.putIfAbsent("timestamp",Instant.now().toString());Instant.parse(text(p,"timestamp"));
         Map<String,Object> success=map(prev.getOrDefault("last_success",Map.of()));
         if(status.equals("ok")&&(success.isEmpty()||Long.parseLong(rev)>=Long.parseLong(text(success,"source_revision"))))success=new LinkedHashMap<>(p);
         if(!success.isEmpty())p.put("last_success",success);
@@ -156,21 +158,21 @@ public final class Store implements AutoCloseable {
         long until=Math.addExact(System.currentTimeMillis(),lease);List<Object> out=new ArrayList<>();String prefix=index+"\0";Iterator<String> it=frontier.keyIterator(prefix);
         while(it.hasNext()&&out.size()<count){String k=it.next();if(!k.startsWith(prefix))break;String item=frontier.get(k),ck=json(List.of(work,item)),oldToken=activeClaims.get(ck);Map<String,Object> prev=oldToken==null?Map.of():J.obj(claims.get(oldToken));
             if(!prev.isEmpty()&&alive(oldToken))continue;
-            String token=UUID.randomUUID().toString()+":"+next("next_fence");Map<String,Object> c=Map.of("token",token,"item",item,"source_revision",text(row(item),"revision"),"owner",owner,"work",work,"until",Long.toString(until),"lease_ms",Long.toString(lease));
-            if(oldToken!=null){claims.remove(oldToken);deadlineRemove(oldToken);}claims.put(token,json(c));deadlinePut(token,System.nanoTime()+lease*1000000);activeClaims.put(ck,token);out.add(c);
+            String token=UUID.randomUUID().toString()+":"+next("next_fence");Map<String,Object> c=Map.of("token",token,"item",item,"source_revision",text(row(item),"revision"),"owner",owner,"work",work,"until",Long.toString(until),"lease_ms",Long.toString(lease),"owner_epoch",ownerEpoch,"deadline_ns",Long.toString(System.nanoTime()+lease*1000000));
+            if(oldToken!=null)claims.remove(oldToken);claims.put(token,json(c));activeClaims.put(ck,token);out.add(c);
         }
         return json(out);
     }
-    private boolean alive(String token){Long d=deadlines.get(token);return d!=null&&System.nanoTime()<d;}
+    private boolean alive(String token){String raw=claims.get(token);if(raw==null)return false;var c=J.obj(raw);long deadline=ownerEpoch.equals(text(c,"owner_epoch"))?Long.parseLong(text(c,"deadline_ns")):ownerStarted+Long.parseLong(text(c,"lease_ms"))*1000000;return System.nanoTime()<deadline;}
     private String finish(String op,String... a){
         String raw=claims.get(a[0]);if(raw==null)return outcome("fenced-or-expired");var c=J.obj(raw);String ck=json(List.of(text(c,"work"),text(c,"item")));
         if(!a[0].equals(activeClaims.get(ck))||!alive(a[0]))return outcome("fenced-or-expired");
-        if(op.equals("renew")){long lease=Long.parseLong(a[1]);if(lease<1||lease>86400000)throw new IllegalArgumentException("invalid-lease");c.put("until",Long.toString(Math.addExact(System.currentTimeMillis(),lease)));c.put("lease_ms",Long.toString(lease));deadlinePut(a[0],System.nanoTime()+lease*1000000);claims.put(a[0],json(c));return ok();}
+        if(op.equals("renew")){long lease=Long.parseLong(a[1]);if(lease<1||lease>86400000)throw new IllegalArgumentException("invalid-lease");c.put("until",Long.toString(Math.addExact(System.currentTimeMillis(),lease)));c.put("lease_ms",Long.toString(lease));c.put("owner_epoch",ownerEpoch);c.put("deadline_ns",Long.toString(System.nanoTime()+lease*1000000));claims.put(a[0],json(c));return ok();}
         if(op.equals("complete")){
             if(a.length<3||!a[2].equals(text(c,"source_revision"))||!a[2].equals(text(row(text(c,"item")),"revision")))return outcome("conflict");
             var result=J.obj(a[1]);if(!a[2].equals(text(result,"source_revision")))return outcome("conflict");record(text(c,"item"),result);
         }
-        claims.remove(a[0]);deadlineRemove(a[0]);activeClaims.remove(ck);return ok();
+        claims.remove(a[0]);activeClaims.remove(ck);return ok();
     }
 
     public synchronized Cursor query(String operation,String... args){
@@ -195,7 +197,7 @@ public final class Store implements AutoCloseable {
                 Object raw=J.parse(a[1]);if(!(raw instanceof List<?> ids))throw new IllegalArgumentException("ids must be array");if(ids.size()>4096)throw new IllegalArgumentException("subset-too-large: use bounded batches");
                 Map<String,Object> opts=J.obj(a[2]);keys(opts,"stage","namespace","slot","projection");
                 if(opts.containsKey("projection")&&!Set.of("last_success","latest_attempt").contains(text(opts,"projection")))throw new IllegalArgumentException("invalid-projection");
-                if(opts.containsKey("stage"))required(text(opts,"namespace"),"baseline namespace");
+                if(opts.containsKey("stage")){opts.putIfAbsent("namespace",a[0]);required(text(opts,"namespace"),"baseline namespace");}
                 source=ids.stream().map(x->compare(x,view,aliasView,opts)).iterator();
             } else if(op.equals("stage_difference")){
                 Map<String,Object> opts=J.obj(a[2]);keys(opts,"index","require_index","require_matching_source_revision");String name=required(text(opts,"index"),"index");
@@ -205,7 +207,9 @@ public final class Store implements AutoCloseable {
                 String prefix=name+"\0";Iterator<String> keys=fronts.keyIterator(prefix);
                 source=new Iterator<Object>(){String next;boolean ready;public boolean hasNext(){if(!ready&&keys.hasNext()){next=keys.next();ready=true;}return ready&&next.startsWith(prefix);}public Object next(){if(!hasNext())throw new NoSuchElementException();ready=false;examined++;return decode(view.get(id(fronts.get(next))));}};
             } else throw new IllegalArgumentException("unsupported-query: "+op);
-            return new Cursor(source,ownSnapshot?this:null);
+            Iterator<?> values=source;
+            Iterator<Object> guarded=new Iterator<>(){private void valid(){if(ended)throw new IllegalStateException("snapshot-closed");}public boolean hasNext(){valid();return values.hasNext();}public Object next(){valid();return values.next();}};
+            return new Cursor(guarded,ownSnapshot?this:null);
         }
         @Override public void close(){synchronized(Store.this){if(!ended){ended=true;db.deregisterVersionUsage(pin);snapshots.remove(this);}}}
     }
@@ -216,14 +220,14 @@ public final class Store implements AutoCloseable {
         if(bytes==null)return Map.of("identity",identity,"state","unknown","reason","no-item");
         var r=decode(bytes);Map<String,Object> out=new LinkedHashMap<>(r);
         Map<String,Object> stageViews=new TreeMap<>();for(var stage:stages(r).entrySet()){String names=meta.get("dict:"+stage.getKey());stageViews.put(names==null?stage.getKey():names,stage.getValue());}out.put("stages",stageViews);
-        out.put("state","unknown");out.put("reason","no-baseline");
+        out.put("state","unknown");out.put("reason","no-baseline");out.put("basis","none");
         if(opts.containsKey("stage")) {
             Map<String,Object> selector=new LinkedHashMap<>(opts);selector.putIfAbsent("projection","last_success");Map<String,Object> base=projection(r,selector);out.put("recorded",base);
             if(!base.isEmpty()){
                 Object observation=r.get("observation");
                 if(observation instanceof Map<?,?> o&&Boolean.FALSE.equals(o.get("present"))){out.put("state","recorded-but-missing-locally");out.put("reason","observed-absence");}
                 else if(!r.containsKey("content_hash")&&observation==null){out.put("reason","unobserved-local");}
-                else {out.put("state",text(base,"source_revision").equals(text(r,"revision"))?"same-as-recorded":"changed");out.put("reason","revision-comparison");}
+                else {Map<String,Object> fingerprint=map(base.getOrDefault("source_fingerprint",Map.of()));boolean digests=!text(fingerprint,"hash").isEmpty()&&!text(r,"content_hash").isEmpty();boolean same=digests?text(fingerprint,"hash").equals(text(r,"content_hash")):text(base,"source_revision").equals(text(r,"revision"));out.put("state",same?"same-as-recorded":"changed");out.put("reason",digests?"digest-comparison":"revision-comparison");out.put("basis",digests?"digest":"revision");}
             }
         }
         return out;
@@ -249,11 +253,11 @@ public final class Store implements AutoCloseable {
         private final Store store;private final List<Map<String,Object>> operations=new ArrayList<>();private boolean ended;private int bytes;
         Batch(Store store){this.store=store;}
         public Batch add(String operation){if(ended)throw new IllegalStateException("batch-closed");bytes=Math.addExact(bytes,operation.getBytes(StandardCharsets.UTF_8).length);if(bytes>Math.min(MAX_BATCH,Main.memoryBudget()/4))throw new IllegalArgumentException("batch-exceeds-LMFILES_MAX_MEMORY_MB");var op=J.obj(operation);keys(op,"op","args");required(text(op,"op"),"op");if(!(op.get("args") instanceof List<?>))throw new IllegalArgumentException("operation args must be array");operations.add(op);return this;}
-        public String commit(){if(ended)throw new IllegalStateException("batch-closed");synchronized(store){try{return store.mutate(()->{for(var op:operations){List<?> args=(List<?>)op.get("args");store.change(text(op,"op"),args.stream().map(x->{if(!(x instanceof String))throw new IllegalArgumentException("batch args must be strings");return (String)x;}).toArray(String[]::new));}return ok();});}finally{ended=true;operations.clear();}}}
+        public String commit(){if(ended)throw new IllegalStateException("batch-closed");synchronized(store){try{return store.mutate(()->{for(var op:operations){List<?> args=(List<?>)op.get("args");String result=store.change(text(op,"op"),args.stream().map(x->{if(!(x instanceof String))throw new IllegalArgumentException("batch args must be strings");return (String)x;}).toArray(String[]::new));Object receipt=J.parse(result);if(receipt instanceof Map<?,?> m&&m.containsKey("status")&&!"ok".equals(m.get("status")))throw new IllegalArgumentException("batch-operation-"+m.get("status"));}return ok();});}finally{ended=true;operations.clear();}}}
         public void rollback(){ended=true;operations.clear();}
         @Override public void close(){if(!ended)rollback();}
     }
-    private String doctor(){long rows=0;long pendingCount=0;for(var entry:items.entrySet()){Map<String,Object> r=decode(entry.getValue());if(!Long.toString(entry.getKey()).equals(text(r,"item")))throw new IllegalStateException("item-key-corrupt");for(var d:differences.entrySet()){boolean expected=pending(r,J.obj(d.getValue()));if(expected)pendingCount++;if(expected!=frontier.containsKey(frontierKey(d.getKey(),text(r,"item"))))throw new IllegalStateException("frontier-corrupt");}rows++;}if(pendingCount!=frontier.sizeAsLong())throw new IllegalStateException("orphan-frontier");for(var e:events.entrySet())if(!e.getKey().toString().equals(text(decode(e.getValue()),"sequence")))throw new IllegalStateException("event-sequence-corrupt");for(var a:aliases.entrySet())if(!items.containsKey(a.getValue()))throw new IllegalStateException("dangling-alias");return ok("items",Long.toString(rows),"events",Long.toString(events.sizeAsLong()),"examined",Long.toString(examined),"storage","MVStore positional I/O, compressed CRC32C binary records");}
+    private String doctor(){if(items.sizeAsLong()!=Long.parseLong(meta.get("next_item"))||events.sizeAsLong()!=Long.parseLong(meta.get("next_event")))throw new IllegalStateException("record-sequence-gap");long rows=0;long pendingCount=0;for(var entry:items.entrySet()){Map<String,Object> r=decode(entry.getValue());if(!Long.toString(entry.getKey()).equals(text(r,"item")))throw new IllegalStateException("item-key-corrupt");for(var d:differences.entrySet()){boolean expected=pending(r,J.obj(d.getValue()));if(expected)pendingCount++;if(expected!=frontier.containsKey(frontierKey(d.getKey(),text(r,"item"))))throw new IllegalStateException("frontier-corrupt");}rows++;}if(pendingCount!=frontier.sizeAsLong())throw new IllegalStateException("orphan-frontier");for(var e:events.entrySet())if(!e.getKey().toString().equals(text(decode(e.getValue()),"sequence")))throw new IllegalStateException("event-sequence-corrupt");for(var a:aliases.entrySet())if(!items.containsKey(a.getValue()))throw new IllegalStateException("dangling-alias");return ok("items",Long.toString(rows),"events",Long.toString(events.sizeAsLong()),"examined",Long.toString(examined),"storage","MVStore positional I/O, compressed CRC32C binary records");}
     public boolean doctorStatus(){return "ok".equals(text(J.obj(doctor()),"status"));}
     private String export(Path out){
         try {
@@ -274,9 +278,9 @@ public final class Store implements AutoCloseable {
     private String restore(Path input){
         if(!items.isEmpty())throw new IllegalArgumentException("import-requires-empty-registry");long rows=0;boolean end=false;
         try(var lines=Files.newBufferedReader(input)){
-            String first=lines.readLine();if(first==null||!"snapshot".equals(text(J.obj(first),"kind"))||!"1".equals(J.text(J.obj(first),"format","")))throw new IllegalArgumentException("snapshot-header");
-            String line;while((line=lines.readLine())!=null){Map<String,Object> r=J.obj(line);
-                if("end".equals(text(r,"kind"))){if(Long.parseLong(text(r,"rows"))!=rows||lines.readLine()!=null)throw new IllegalArgumentException("snapshot-count");end=true;break;}
+            String first=boundedLine(lines);if(first==null||!"snapshot".equals(text(J.obj(first),"kind"))||!"1".equals(J.text(J.obj(first),"format","")))throw new IllegalArgumentException("snapshot-header");
+            String line;while((line=boundedLine(lines))!=null){Map<String,Object> r=J.obj(line);
+                if("end".equals(text(r,"kind"))){if(Long.parseLong(text(r,"rows"))!=rows||boundedLine(lines)!=null)throw new IllegalArgumentException("snapshot-count");end=true;break;}
                 String checksum=text(r,"checksum");r.remove("checksum");if(!PlanLog.sha(json(r)).equals(checksum))throw new IllegalArgumentException("snapshot-checksum");
                 String name=text(r,"map"),key=text(r,"key");Object v=r.get("value");switch(name){
                     case "items","events" -> {byte[] bytes=Base64.getDecoder().decode(text(map(v),"base64"));decode(bytes);(name.equals("items")?items:events).put(Long.parseLong(key),bytes);}
@@ -289,6 +293,7 @@ public final class Store implements AutoCloseable {
         }catch(IOException e){throw new UncheckedIOException(e);}
         doctor();return ok("rows",Long.toString(rows));
     }
+    private static String boundedLine(BufferedReader reader)throws IOException {StringBuilder out=new StringBuilder();int c;long limit=Math.min(2L*MAX_RECORD,Main.memoryBudget()/4);while((c=reader.read())!=-1){if(c=='\n')return out.toString();if(out.length()>=limit)throw new IllegalArgumentException("snapshot-line-exceeds-memory-budget");out.append((char)c);}return out.isEmpty()?null:out.toString();}
     private static byte[] encode(Map<String,Object> map){try{byte[] raw=json(map).getBytes(StandardCharsets.UTF_8);if(raw.length>Math.min(MAX_RECORD,Main.memoryBudget()/4))throw new IllegalArgumentException("record-exceeds-memory-budget");var zipped=new ByteArrayOutputStream();try(var out=new DeflaterOutputStream(zipped)){out.write(raw);}byte[] data=zipped.toByteArray();CRC32C crc=new CRC32C();crc.update(data);ByteBuffer b=ByteBuffer.allocate(12+data.length);b.putInt(1).putInt(raw.length).putInt((int)crc.getValue()).put(data);return b.array();}catch(IOException e){throw new UncheckedIOException(e);}}
     private static Map<String,Object> decode(byte[] bytes){try{if(bytes.length<12)throw new IllegalStateException("record-truncated");ByteBuffer b=ByteBuffer.wrap(bytes);if(b.getInt()!=1)throw new IllegalStateException("record-version");int length=b.getInt(),check=b.getInt();if(length<0||length>MAX_RECORD)throw new IllegalStateException("record-length");byte[] data=Arrays.copyOfRange(bytes,12,bytes.length);CRC32C crc=new CRC32C();crc.update(data);if(check!=(int)crc.getValue())throw new IllegalStateException("record-checksum");try(var in=new InflaterInputStream(new ByteArrayInputStream(data))){byte[] raw=in.readNBytes(length+1);if(raw.length!=length)throw new IllegalStateException("record-size");return J.obj(new String(raw,StandardCharsets.UTF_8));}}catch(IOException e){throw new IllegalStateException("record-corrupt",e);}}
     private void cleanup(){try{if(db!=null)db.closeImmediately();}catch(Exception ignored){}try{if(lock!=null)lock.release();}catch(Exception ignored){}try{if(lockChannel!=null)lockChannel.close();}catch(Exception ignored){}}

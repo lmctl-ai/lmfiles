@@ -9,7 +9,7 @@ public final class Main {
   public static final String VERSION="0.1.0";
   private Main(){}
   public static long memoryBudget(){String v=System.getenv("LMFILES_MAX_MEMORY_MB");if(v==null)return 256L*1024*1024;try{long n=Long.parseLong(v);if(n<=0)throw new NumberFormatException();return Math.multiplyExact(n,1024L*1024);}catch(Exception e){throw new IllegalArgumentException("LMFILES_MAX_MEMORY_MB must be positive whole MiB");}}
-  public static void main(String[] args){int code;try{code=run(args);}catch(OutOfMemoryError e){System.err.println("lmfiles: LMFILES_MAX_MEMORY_MB memory budget exceeded");code=3;}catch(VmException e){System.err.println("lmfiles: "+e.getMessage());code=3;}catch(IllegalArgumentException e){System.err.println("lmfiles: "+e.getMessage());code=2;}catch(Exception e){String m=e.getMessage();System.err.println("lmfiles: "+(m==null?"registry operation failed ("+e.getClass().getSimpleName()+")":m));code=3;}if(code!=0)System.exit(code);}
+  public static void main(String[] args){int code;try{code=run(args);}catch(OutOfMemoryError e){System.err.println("lmfiles: LMFILES_MAX_MEMORY_MB memory budget exceeded");code=3;}catch(VmException e){System.err.println("lmfiles: "+e.getMessage());code=Arrays.asList(args).contains("--dsl")?Reports.error("load",e):3;}catch(IllegalArgumentException e){System.err.println("lmfiles: "+e.getMessage());code=2;}catch(Exception e){String m=e.getMessage();System.err.println("lmfiles: "+(m==null?"registry operation failed ("+e.getClass().getSimpleName()+")":m));code=3;}if(code!=0)System.exit(code);}
   static int run(String[] args)throws Exception{
     memoryBudget();
     if(args.length==0||args[0].equals("--help")){usage();return args.length==0?2:0;}

@@ -84,12 +84,12 @@ def main() -> int:
 
         # A kill at each commit boundary must leave a valid same-DB state. The
         # after-commit point may contain the row; before-commit must not.
-        for point, expect_item in (("before_commit", False), ("after_commit", True)):
+        for point, expect_item in (("before_commit", False), ("mid_commit", False), ("after_commit", True), ("disk_full",False)):
             killed_db = root / f"kill-{point}.mv"
             call("--request", str(killed_db), "doctor")
             killed = call("--request", str(killed_db), "item_upsert", identity, fields,
                           env={"LMFILES_KILL_POINT": point}, check=False)
-            assert killed.returncode == 77, killed.stderr
+            assert killed.returncode == 77 if point!="disk_full" else killed.returncode!=0, killed.stderr
             check = call("--request", str(killed_db), "doctor")
             assert json.loads(check.stdout).get("status") == "ok"
             rows = call("--query", str(killed_db), "query_subset", "cli", json.dumps(["1"]), "{}").stdout
@@ -102,7 +102,8 @@ def main() -> int:
         # Compaction faults preserve a previously acknowledged generation.
         compact_db=root/'compact.mv'
         call('--request',str(compact_db),'item_upsert',identity,fields)
-        for point in ('before_compaction','after_compaction'):
+        for point in ('before_compaction','mid_compaction','after_compaction'):
+            call('--request',str(compact_db),'item_upsert',identity,fields)
             killed=call('--request',str(compact_db),'compact',env={'LMFILES_KILL_POINT':point},check=False)
             assert killed.returncode==77,killed.stderr
             assert json.loads(call('--request',str(compact_db),'doctor').stdout)['items']=='1'

@@ -19,6 +19,7 @@ savedsl(state, "build/claims-state.dslb");
 let run = system ${dsl_cli(state)} --dsl build/claims-state.dslb;
 assert(run.code == 0);
 
+assert(read_file(".lmfiles-local/claims/data.dat")=="worker-a 3\nworker-b 3\nremainder 4\n");
 let plot = _lmcode_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
 plot.png("images/claims.png", 820, 520);
 plot.cmd("set title 'Claimed lifecycle work'; set ylabel 'items'; set style data histograms; set style fill solid 0.8; set datafile separator ' '; set yrange [0:*]; plot '.lmfiles-local/claims/data.dat' using 2:xtic(1) title 'claims'");
