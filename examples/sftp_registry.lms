@@ -1,0 +1,82 @@
+# Real lmssh + registry. Default: a private, throwaway loopback sshd; no system config changes.
+# Optional argument: local fixture connection JSON (dest, port, identity, known_hosts, local, remote).
+mkdir(".lmfiles-local/sftp");mkdir("build");mkdir("images");
+let ROOT=".lmfiles-local/sftp";let READY=ROOT+"/fixture.json";let STOP=ROOT+"/stop";
+let FIXTURE="import json,os,pathlib,pwd,shutil,socket,subprocess,sys,tempfile,time\nready,stop=map(pathlib.Path,sys.argv[1:3])\nsshd=shutil.which(\"sshd\") or \"/usr/sbin/sshd\"\nwith tempfile.TemporaryDirectory(prefix=\"lmfiles-local-sshd-\") as tmp:\n d=pathlib.Path(tmp)\n for name in [\"host_key\",\"client\"]:subprocess.run([\"ssh-keygen\",\"-q\",\"-t\",\"ed25519\",\"-N\",\"\",\"-f\",str(d/name)],check=True,timeout=10)\n (d/\"authorized_keys\").write_text((d/\"client.pub\").read_text());os.chmod(d/\"authorized_keys\",0o600)\n with socket.socket() as s:s.bind((\"127.0.0.1\",0));port=s.getsockname()[1]\n cfg=d/\"sshd_config\";cfg.write_text(f\"Port {port}\\nListenAddress 127.0.0.1\\nHostKey {d/'host_key'}\\nPidFile {d/'sshd.pid'}\\nAuthorizedKeysFile {d/'authorized_keys'}\\nStrictModes no\\nUsePAM no\\nPasswordAuthentication no\\nKbdInteractiveAuthentication no\\nPermitRootLogin yes\\nSubsystem sftp internal-sftp\\nLogLevel ERROR\\n\")\n known=d/\"known_hosts\";known.write_text(f\"[127.0.0.1]:{port} \"+(d/\"host_key.pub\").read_text())\n local=d/\"input.txt\";local.write_text(\"synthetic registry SFTP text\\n\"*100)\n (d/\"remote\").mkdir()\n with (d/\"daemon.log\").open(\"w+\") as log:\n  p=subprocess.Popen([sshd,\"-D\",\"-e\",\"-f\",str(cfg)],stdout=log,stderr=log)\n  try:\n   for _ in range(50):\n    if p.poll() is not None:log.seek(0);raise RuntimeError(log.read())\n    try:\n     with socket.create_connection((\"127.0.0.1\",port),timeout=.1):break\n    except OSError:time.sleep(.05)\n   ready.write_text(json.dumps(dict(dest=pwd.getpwuid(os.getuid()).pw_name+\"@127.0.0.1\",port=port,identity=str(d/\"client\"),known_hosts=str(known),local=str(local),remote=str(d/\"remote\"/\"object.txt\"))))\n   until=time.monotonic()+90\n   while not stop.exists() and time.monotonic()<until:time.sleep(.1)\n  finally:p.terminate();p.wait(timeout=5)\n";
+fn execute(p,name) {
+ let path="build/sftp-"+name+".dslb";savedsl(p,path);
+ let r=system(concat(dsl_cli(p),["--dsl",path]),120000);assert(r.code==0,r.stdout+r.stderr);return true;
+}
+fn quote(path) {
+ assert(!contains(path,"\n")&&!contains(path,"\r")&&!contains(path,"\u0000"),"SFTP path contains control character");
+ return "\""+replace_all(replace_all(path,"\\","\\\\"),"\"","\\\"")+"\"";
+}
+fn server() {let r=system(["python3","-c",FIXTURE,READY,STOP],100000);assert(r.code==0,r.stderr);return true;}
+fn waiting_job(){
+ for(i in range(0,500)){if(file_exists(READY)){break;}sleep_ms(10);}assert(file_exists(READY));
+ job(read_json(READY));write_file(STOP,"stop");return true;
+}
+fn job(config) {
+ let DEST=config.dest;let PORT=config.port;let KEY=config.identity;let KNOWN=config.known_hosts;let LOCAL=config.local;let REMOTE=config.remote;
+ assert(ends_with(DEST,"@127.0.0.1"),"this example accepts only loopback fixtures");
+ let DB=ROOT+"/state.mv";let DOWN=ROOT+"/downloaded.txt";let TEMP=REMOTE+".lmfiles-partial";
+ let info=_lmcode_ cli="lmssh" install="github:lmctl-ai/lmssh@latest";
+io.write(".lmfiles-local/sftp/hash.txt",io.sha256(${LOCAL}));
+let prior="";if(io.exists(${DOWN})){prior=io.sha256(${DOWN});}io.write(".lmfiles-local/sftp/down-hash.txt",prior);
+end _lmcode_
+ execute(info,"hash");let HASH=trim(read_file(ROOT+"/hash.txt"));let LOCAL_DOWN_HASH=trim(read_file(ROOT+"/down-hash.txt"));
+ let size=system(["python3","-c","import os,sys;print(os.stat(sys.argv[1]).st_size)",LOCAL],10000);assert(size.code==0);let SIZE=trim(size.stdout);
+ let INIT=json_stringify({id:DEST+":"+str(PORT)+":"+REMOTE});let FIELDS=json_stringify({content_hash:HASH,size:SIZE});
+ let init=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
+let db=registry.open(${DB},"sftp","{}");file_write(".lmfiles-local/sftp/item.json",db.item_upsert(${INIT},${FIELDS}));db.close();
+end _lmcode_
+ execute(init,"init");let item=read_json(ROOT+"/item.json");let ITEM=item.item;let REV=item.revision;let NS=DEST+":"+str(PORT);
+ let uploads=0;let downloads=0;
+ for(pass in range(0,2)) {
+  for(stage in ["published","downloaded"]) {
+   let SELECTOR=json_stringify({stage:stage,namespace:NS,projection:"last_success"});
+   let query=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
+let db=registry.open(${DB},"sftp","{}");let c=db.query_subset("sftp",${json_stringify([ITEM])},${SELECTOR});
+file_write(".lmfiles-local/sftp/query.json",c.next_json(1,1048576));c.close();db.close();
+end _lmcode_
+   execute(query,"query");let row=read_json(ROOT+"/query.json")[0];
+   let have_local=stage!="downloaded"||(file_exists(DOWN)&&LOCAL_DOWN_HASH==HASH);
+   if(row.state=="same-as-recorded"&&have_local){continue;}
+   if(stage=="published") {
+    let BATCH="-mkdir "+quote(dirname(REMOTE))+"\nreput -p "+quote(LOCAL)+" "+quote(TEMP)+"\n";
+    let INITIAL="put -p "+quote(LOCAL)+" "+quote(TEMP)+"\n";
+    let send=_lmcode_ cli="lmssh" install="github:lmctl-ai/lmssh@latest";
+let s=ssh.connect(${DEST}).port(${PORT}).config("/dev/null").identity(${KEY}).known_hosts(${KNOWN}).strict_host_key("yes").timeout(60);
+let r=s.sftp(${BATCH});
+if(!r.ok() && str_contains(r.stderr(),"stat remote: No such file")){s.sftp(${INITIAL}).require();}else{r.require();}
+s.rename(${TEMP},${REMOTE});s.close();
+end _lmcode_
+    execute(send,"upload");uploads=uploads+1;
+   } else {
+    let BATCH="reget -p "+quote(REMOTE)+" "+quote(DOWN+".partial")+"\n";
+    let receive=_lmcode_ cli="lmssh" install="github:lmctl-ai/lmssh@latest";
+let s=ssh.connect(${DEST}).port(${PORT}).config("/dev/null").identity(${KEY}).known_hosts(${KNOWN}).strict_host_key("yes").timeout(60);
+s.sftp(${BATCH}).require();
+if(io.sha256(${DOWN+".partial"})!=${HASH}){io.fail("download digest mismatch");}s.close();
+end _lmcode_
+    execute(receive,"download");assert(move_file(DOWN+".partial",DOWN));downloads=downloads+1;LOCAL_DOWN_HASH=HASH;
+   }
+   let RESULT=json_stringify({stage:stage,namespace:NS,status:"ok",source_revision:REV,source_fingerprint:{hash:HASH,size:SIZE},metadata:{remote_path:REMOTE,local_path:LOCAL,download:DOWN,resume:true,remote_listing:false}});
+   let record=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
+let db=registry.open(${DB},"sftp","{}");db.stage_record(${ITEM},${RESULT});db.close();
+end _lmcode_
+   execute(record,"record");
+  }
+ }
+ write_json(ROOT+"/report.json",{uploads:uploads,downloads:downloads,remote_listing:false,cloud_requests:0});
+ let DATA="uploaded "+str(uploads)+"\ndownloaded "+str(downloads)+"\n";
+ let plot=_lmcode_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+plot.png("images/sftp_registry.png",900,520);plot.data("OPS",${DATA});plot.cmd("set title 'Strict loopback SFTP: registry selects transfers';set yrange [0:1.5];set style data histograms;set style fill solid 0.75;plot $OPS using 2:xtic(1) notitle");plot.close();
+end _lmcode_
+ execute(plot,"plot");return true;
+}
+if(ARGV.len()>0){job(read_json(ARGV[0]));}else{
+ if(file_exists(READY)){remove_file(READY);}if(file_exists(STOP)){remove_file(STOP);}
+ parallel([server(),waiting_job()]);
+}
+println("estimated cost: $0.00 (throwaway loopback sshd only)");

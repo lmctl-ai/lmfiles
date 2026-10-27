@@ -18,3 +18,16 @@ and a persistent local fake S3-like executor. No AWS host or credentials are
 needed. `scripts/test-pipeline.py` checks all three effect-before-confirmation
 interruptions, replay, bytes and a second no-op (12 checks); `--gallery` renders
 its README picture. Explicit hosts install from `github:lmctl-ai/<name>@latest`.
+
+`download_lmcurl.lms` uses released lmcurl 0.1.2 Request.allow_error plus ETag and
+Last-Modified headers against loopback only. It reads a URL list, queries registry
+stage metadata, skips recorded gone URLs, verifies unchanged candidates locally,
+and records outcomes/failure counts. `scripts/test-pairings.py`:11 checks.
+
+`sftp_registry.lms` uses released lmssh 0.1.1 and a private temporary sshd (Python3,
+ssh-keygen and installed sshd required). Strict known_hosts, reput/reget -p,
+temporary names, rename, and query-driven skips; no remote listing/checksum calls.
+`scripts/test-sftp.py`:9 Linux checks including actual upload/download interruption
+and resume, digest validation, local corruption and host-key refusal. A new remote
+partial must first be created: only reput's explicit missing-remote error selects
+initial put; other failures remain failures. All fixtures are temporary/synthetic.

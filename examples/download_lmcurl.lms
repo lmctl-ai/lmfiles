@@ -1,0 +1,92 @@
+# Real lmcurl + registry; default is a self-contained synthetic loopback HTTP job.
+# Optional BASE_URL and URL_LIST arguments are restricted to loopback fixtures.
+mkdir(".lmfiles-local/download"); mkdir("build"); mkdir("images");
+let ROOT=".lmfiles-local/download"; let READY=ROOT+"/ready"; let STOP=ROOT+"/stop";
+let CODE="import http.server,pathlib,sys,time\nready,stop=map(pathlib.Path,sys.argv[1:3])\nclass H(http.server.BaseHTTPRequestHandler):\n def log_message(self,*args):pass\n def do_GET(self):\n  body=b\"synthetic law fixture\\n\"; status=200\n  if self.path==\"/stable\":\n   if self.headers.get(\"If-None-Match\")== '\"fixture-v1\"' or self.headers.get(\"If-Modified-Since\")==\"Wed, 01 Jan 2025 00:00:00 GMT\":status=304;body=b\"\"\n  elif self.path==\"/slow\":time.sleep(.35);body=b\"slow synthetic text\\n\"\n  elif self.path==\"/fail\":status=500;body=b\"synthetic failure\\n\"\n  elif self.path==\"/disconnect\":self.connection.close();return\n  else:status=404;body=b\"gone\\n\"\n  self.send_response(status);self.send_header(\"Content-Length\",str(len(body)))\n  if self.path==\"/stable\":self.send_header(\"ETag\",'\"fixture-v1\"');self.send_header(\"Last-Modified\",\"Wed, 01 Jan 2025 00:00:00 GMT\")\n  self.end_headers()\n  try:self.wfile.write(body)\n  except BrokenPipeError:pass\ns=http.server.ThreadingHTTPServer((\"127.0.0.1\",0),H);s.daemon_threads=True;s.timeout=.1\nready.write_text(\"http://127.0.0.1:\"+str(s.server_port))\nend=time.monotonic()+45\nwhile not stop.exists() and time.monotonic()<end:s.handle_request()\ns.server_close()\n";
+fn execute(p,name) {
+  let out="build/download-"+name+".dslb"; savedsl(p,out);
+  let r=system(concat(dsl_cli(p),["--dsl",out]),30000); assert(r.code==0,r.stderr); return true;
+}
+fn fixture() { let r=system(["python3","-c",CODE,READY,STOP],55000); assert(r.code==0);return true; }
+fn waiting_job() {
+  for(i in range(0,500)) { if(file_exists(READY)){break;} sleep_ms(10); }
+  assert(file_exists(READY));
+  job(trim(read_file(READY)));
+  write_file(STOP,"stop");return true;
+}
+fn job(base) {
+  assert(starts_with(base,"http://127.0.0.1:"),"local fixture URL required");
+  let LIST=ARGV.len()>1?ARGV[1]:ROOT+"/urls.txt";
+  if(ARGV.len()<2) { write_file(LIST,base+"/stable\n"+base+"/gone\n"+base+"/slow\n"+base+"/fail\n"+base+"/disconnect\n"); }
+  let urls=read_lines(LIST);let requests=0;let conditional=0;let gone=0;let failed=0;let skipped=0;let fetched=0;
+  # Two passes show conditional refresh and a recorded gone URL that is not requested again.
+  for(pass in range(0,2)) {
+    let index=0;
+    for(url in urls) {
+      if(trim(url)==""){continue;}
+      assert(starts_with(url,base+"/"),"URL list must stay on the local fixture");
+      let FILE=ROOT+"/file-"+str(index)+".txt";index=index+1;
+      let IDENTITY=json_stringify({id:url});
+      let init=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
+let db=registry.open(".lmfiles-local/download/state.mv","download","{}");
+file_write(".lmfiles-local/download/item.json",db.item_upsert(${IDENTITY},"{}"));db.close();
+end _lmcode_
+      execute(init,"init");let item=read_json(ROOT+"/item.json");let ITEM=item.item;
+      let query=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
+let db=registry.open(".lmfiles-local/download/state.mv","download","{}");
+let c=db.query_subset("lmcurl",${json_stringify([ITEM])},"{\"stage\":\"fetched\",\"namespace\":\"lmcurl\",\"projection\":\"latest_attempt\"}");
+file_write(".lmfiles-local/download/query.json",c.next_json(1,1048576));c.close();db.close();
+end _lmcode_
+      execute(query,"query");let row=read_json(ROOT+"/query.json")[0];let previous=row.get("recorded",{});let metadata=previous.get("metadata",{});
+      if(previous.get("status","")=="gone"){skipped=skipped+1;continue;}
+      let candidate=previous.get("status","")=="ok" && file_exists(FILE) && sha256(read_file(FILE))==metadata.get("hash","");
+      let ETAG=candidate?metadata.get("etag",""):"";let MODIFIED=candidate?metadata.get("last_modified",""):"";
+      let TEMP=FILE+".partial";let TIMEOUT=contains(url,"/slow")?100:1500;
+      let fetch=_lmcode_ cli="lmcurl" install="github:lmctl-ai/lmcurl@latest";
+let q=curl.session(${url}).get("").proxy("").timeout(${TIMEOUT}).limit(1048576).allow_error(true);
+if(${ETAG}!=""){q.header("If-None-Match",${ETAG});}
+if(${MODIFIED}!=""){q.header("If-Modified-Since",${MODIFIED});}
+let r=q.send();
+if(r.status()==200){assert_eq(r.error(),"");r.save(${TEMP});}
+if(r.status()==304){assert_eq(r.bytes(),0);}
+file_write(".lmfiles-local/download/status.txt",str(r.status()));
+file_write(".lmfiles-local/download/etag.txt",r.header("etag"));
+file_write(".lmfiles-local/download/modified.txt",r.header("last-modified"));
+file_write(".lmfiles-local/download/error.txt",r.error());
+end _lmcode_
+      execute(fetch,"fetch");requests=requests+1;
+      let code=json_parse(read_file(ROOT+"/status.txt"));let status="failed";let hash=metadata.get("hash","");let count=metadata.get("failure_count",0);
+      if(code==200){assert(move_file(TEMP,FILE));hash=sha256(read_file(FILE));status="ok";fetched=fetched+1;count=0;}
+      else if(code==304){assert(candidate,"304 requires a locally verified candidate");status="ok";conditional=conditional+1;count=0;}
+      else if(code==404){status="gone";gone=gone+1;count=count+1;}
+      else {failed=failed+1;count=count+1;}
+      let META={url:url,path:FILE,hash:hash,etag:code==304?ETAG:read_file(ROOT+"/etag.txt"),last_modified:code==304?MODIFIED:read_file(ROOT+"/modified.txt"),http_status:code,error:read_file(ROOT+"/error.txt"),failure_count:count};
+      let observe=code==200?json_stringify({hash:hash,size:str(read_file(FILE).len()),present:true}):"{}";
+      # Read the current revision after a successful new observation.
+      let prepare=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
+let db=registry.open(".lmfiles-local/download/state.mv","download","{}");
+if(${code}==200){db.observe(${ITEM},${observe});}
+let c=db.query_subset("lmcurl",${json_stringify([ITEM])},"{}");file_write(".lmfiles-local/download/current.json",c.next_json(1,1048576));c.close();db.close();
+end _lmcode_
+      execute(prepare,"observe");let current=read_json(ROOT+"/current.json")[0];
+      let RESULT=json_stringify({stage:"fetched",namespace:"lmcurl",status:status,source_revision:current.revision,source_fingerprint:{hash:hash},metadata:META});
+      let record=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
+let db=registry.open(".lmfiles-local/download/state.mv","download","{}");db.stage_record(${ITEM},${RESULT});db.close();
+end _lmcode_
+      execute(record,"record");
+    }
+  }
+  write_json(ROOT+"/report.json",{requests:requests,conditional:conditional,gone:gone,failed:failed,skipped:skipped,fetched:fetched,cloud_requests:0});
+  let DATA="downloaded "+str(fetched)+"\nconditional "+str(conditional)+"\ngone "+str(gone)+"\nfailed "+str(failed)+"\nskipped "+str(skipped)+"\n";
+  let plot=_lmcode_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+plot.png("images/download_lmcurl.png",900,520);plot.data("COUNTS",${DATA});
+plot.cmd("set title 'Real loopback HTTP: registry validators and gone receipts'; set style data histograms;set style fill solid 0.75;set yrange [0:*];plot $COUNTS using 2:xtic(1) notitle");plot.close();
+end _lmcode_
+  execute(plot,"plot");return true;
+}
+if(ARGV.len()>0){job(ARGV[0]);}
+else {
+  if(file_exists(READY)){remove_file(READY);}if(file_exists(STOP)){remove_file(STOP);}
+  parallel([fixture(),waiting_job()]);
+}
+println("estimated cost: $0.00 (loopback HTTP only)");

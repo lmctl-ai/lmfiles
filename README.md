@@ -19,6 +19,11 @@ executor. Confirmed journal receipts advance each user-defined stage. Rerun afte
 `fail-fetch`, `fail-clean` or `fail-publish` to recover the confirmation gap.
 `lmctl https://raw.githubusercontent.com/lmctl-ai/lmfiles/main/examples/pipeline_lifecycle.lms`
 
+| Real HTTP download manager | Registry-driven SFTP upload and download |
+|---|---|
+| ![Conditional HTTP receipts](docs/images/download_lmcurl.png) | ![Strict local SFTP transfers](docs/images/sftp_registry.png) |
+| A URL list, recorded validators, real 304, gone suppression and failure receipts against a private loopback server. Requires Python 3. `lmctl https://raw.githubusercontent.com/lmctl-ai/lmfiles/main/examples/download_lmcurl.lms` | Strict host keys, temporary names, resumable SFTP and no remote listing; starts a throwaway local sshd. Requires Linux, Python 3, ssh-keygen and an installed sshd. `lmctl https://raw.githubusercontent.com/lmctl-ai/lmfiles/main/examples/sftp_registry.lms` |
+
 ## Build and run
 
 Version **0.1.0 is released**. Current main targets **0.1.1**; this patch is
