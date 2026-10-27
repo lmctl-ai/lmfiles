@@ -70,21 +70,22 @@ public final class Store implements AutoCloseable {
     private Map<String,Object> row(String id){byte[] b=items.get(id(id));if(b==null)throw new IllegalArgumentException("unknown-item");return decode(b);}
     private static long id(String s){try{long id=Long.parseLong(s);if(id<=0)throw new NumberFormatException();return id;}catch(NumberFormatException e){throw new IllegalArgumentException("invalid-item-id");}}
     private void save(String id,Map<String,Object> r){items.put(id(id),encode(r));}
-    private static String aliasKey(Map<String,Object> a){keys(a,"kind","namespace","value");return json(List.of(required(text(a,"kind"),"alias kind"),required(text(a,"namespace"),"alias namespace"),Objects.requireNonNull(a.get("value"),"alias value")));}
+    private static String aliasKey(Map<String,Object> a){keys(a,"kind","namespace","value");String kind=required(text(a,"kind"),"alias kind");if("identity".equals(kind))throw new IllegalArgumentException("reserved-alias-kind");return json(List.of(kind,required(text(a,"namespace"),"alias namespace"),Objects.requireNonNull(a.get("value"),"alias value")));}
     private String stageId(String stage,String ns,String slot,boolean create){String k=json(List.of(required(stage,"stage"),required(ns,"namespace"),slot));String d=dictionary.get(k);if(d==null&&create){d=Long.toString(next("next_dict"));dictionary.put(k,d);meta.put("dict:"+d,k);}return d;}
     private static Map<String,Object> stages(Map<String,Object> row){return map(row.computeIfAbsent("stages",k->new TreeMap<String,Object>()));}
     private Map<String,Object> projection(Map<String,Object> row,Map<String,Object> selector){String d=stageId(text(selector,"stage"),text(selector,"namespace"),text(selector,"slot"),false);if(d==null)return Map.of();Object v=stages(row).get(d);if(v==null)return Map.of();Map<String,Object> result=map(v);String p=J.text(selector,"projection","latest_attempt");if(!Set.of("latest_attempt","last_success").contains(p))throw new IllegalArgumentException("invalid-projection");return p.equals("last_success")?map(result.getOrDefault("last_success",Map.of())):result;}
     private void event(String item,String operation,Map<String,Object> data){long n=next("next_event");events.put(n,encode(Map.of("sequence",Long.toString(n),"item",item,"operation",operation,"committed_at",Instant.now().toString(),"data",data)));}
 
+    private static void checkInputBudget(String... a){long limit=Math.min(MAX_RECORD,Main.memoryBudget()/4);for(String arg:a)if(arg!=null&&arg.getBytes(StandardCharsets.UTF_8).length>limit)throw new IllegalArgumentException("input-exceeds-LMFILES_MAX_MEMORY_MB");}
     public synchronized String call(String op,String... a){
         check();
-        for(String arg:a)if(arg.getBytes(StandardCharsets.UTF_8).length>Math.min(MAX_RECORD,Main.memoryBudget()/4))throw new IllegalArgumentException("input-exceeds-LMFILES_MAX_MEMORY_MB");
-        if(op.equals("doctor"))return doctor();
+        checkInputBudget(a);
+        if(op.equals("doctor")){if(a.length>0)keys(J.obj(a[0]),"v");return doctor();}
         if(op.equals("replay_seen"))return json(Map.of("digest",replay.getOrDefault(a[0],"")));
-        if(op.equals("export_records"))return export(Path.of(a[0]));
-        if(op.equals("compact")){kill("before_compaction");if(faultFile!=null){db.setRetentionTime(0);faultFile.armed=true;}db.compactFile(1000);db.sync();kill("after_compaction");return ok();}
+        if(op.equals("export_records")){if(a.length>1)keys(J.obj(a[1]),"v");return export(Path.of(a[0]));}
+        if(op.equals("compact")){kill("before_compaction");int prevRetention=db.getRetentionTime();if(faultFile!=null||snapshots.isEmpty())db.setRetentionTime(0);if(faultFile!=null)faultFile.armed=true;try{db.compactFile(1000);db.sync();}finally{db.setRetentionTime(prevRetention);}kill("after_compaction");return ok();}
         if(op.equals("stats"))return ok("examined",Long.toString(examined),"items",Long.toString(items.sizeAsLong()),"events",Long.toString(events.sizeAsLong()));
-        if(op.equals("apply_records")){try{return PlanLog.apply(this,Path.of(a[0]),Path.of(a[1]));}catch(IOException e){throw new UncheckedIOException(e);}}
+        if(op.equals("apply_records")){if(a.length>2)keys(J.obj(a[2]),"v");try{return PlanLog.apply(this,Path.of(a[0]),Path.of(a[1]));}catch(IOException e){throw new UncheckedIOException(e);}}
         return mutate(()->change(op,a));
     }
     private String change(String op,String... a){return switch(op){
@@ -112,11 +113,16 @@ public final class Store implements AutoCloseable {
     }
     private String alias(String op,String item,Map<String,Object> a){row(item);String k=aliasKey(a);Long prev=aliases.get(k);if(op.equals("alias_add")){if(prev!=null&&prev!=id(item))return outcome("conflict");aliases.put(k,id(item));}else{if(prev==null||prev!=id(item))return outcome("conflict");aliases.remove(k);}event(item,op,a);return ok();}
     private String observe(String item,Map<String,Object> o){
-        keys(o,"hash","size","mtime","mtime_ns","present","algorithm","ctime","file_id");var r=row(item);String h=text(o,"hash");Object prior=r.get("observation");
+        keys(o,"hash","size","mtime","mtime_ns","present","algorithm","ctime","file_id");
+        if(o.containsKey("present")&&!(o.get("present") instanceof Boolean))throw new IllegalArgumentException("present must be boolean");
+        var r=row(item);String h=text(o,"hash");Object prior=r.get("observation");
         boolean changed=!h.isEmpty()&&!h.equals(text(r,"content_hash"));
+        if(prior instanceof Map<?,?> p&&o.containsKey("present")&&!Objects.equals(o.get("present"),p.get("present")))changed=true;
         if(h.isEmpty()&&prior instanceof Map<?,?> p)for(String f:List.of("size","mtime","mtime_ns","present"))if(o.containsKey(f)&&!Objects.equals(o.get(f),p.get(f)))changed=true;
+        if(h.isEmpty()&&prior==null&&o.containsKey("size")&&r.containsKey("size")&&!text(o,"size").equals(text(r,"size")))changed=true;
         if(changed)r.put("revision",Long.toString(Long.parseLong(text(r,"revision"))+1));
-        if(!h.isEmpty())r.put("content_hash",h);r.put("observation",o);save(item,r);refresh(item,r);event(item,"observe",o);return ok("revision",text(r,"revision"));
+        if(!h.isEmpty())r.put("content_hash",h);else if(changed)r.remove("content_hash");
+        r.put("observation",o);save(item,r);refresh(item,r);event(item,"observe",o);return ok("revision",text(r,"revision"));
     }
     private String record(String item,Map<String,Object> result){
         var r=row(item);String stage=required(text(result,"stage"),"stage"),ns=required(text(result,"namespace"),"namespace"),status=text(result,"status");
@@ -130,10 +136,11 @@ public final class Store implements AutoCloseable {
         if(!success.isEmpty())p.put("last_success",success);
         // A late receipt is an event, never a replacement for a newer attempt.
         if(prev.isEmpty()||Long.parseLong(rev)>=Long.parseLong(text(prev,"source_revision")))all.put(d,p);
+        else if(!success.isEmpty()){var keep=new LinkedHashMap<>(prev);keep.put("last_success",success);all.put(d,keep);}
         save(item,r);refresh(item,r);event(item,"stage_record",result);return ok("event",meta.get("next_event"));
     }
     private String forget(String item,String stage,String ns,String slot){var r=row(item);String d=stageId(stage,ns,slot,false);if(d!=null)stages(r).remove(d);save(item,r);refresh(item,r);event(item,"stage_forget",Map.of("stage",stage,"namespace",ns,"slot",slot));return ok();}
-    private static void selector(Map<String,Object> q){keys(q,"stage","namespace","slot","status","projection");required(text(q,"stage"),"stage");required(text(q,"namespace"),"namespace");String status=text(q,"status");if(!status.isEmpty()&&!Set.of("ok","failed","gone","skipped").contains(status))throw new IllegalArgumentException("invalid-status");}
+    private static void selector(Map<String,Object> q){keys(q,"stage","namespace","slot","status","projection");required(text(q,"stage"),"stage");required(text(q,"namespace"),"namespace");String status=text(q,"status");if(!status.isEmpty()&&!Set.of("ok","failed","gone","skipped").contains(status))throw new IllegalArgumentException("invalid-status");String proj=text(q,"projection");if(!proj.isEmpty()&&!Set.of("latest_attempt","last_success").contains(proj))throw new IllegalArgumentException("invalid-projection");}
     private String index(Map<String,Object> a,Map<String,Object> b,Map<String,Object> opts){
         selector(a);selector(b);keys(opts,"id","require_matching_source_revision");
         String id=J.text(opts,"id",PlanLog.sha(json(List.of(a,b,opts))));required(id,"index.id");
@@ -163,7 +170,7 @@ public final class Store implements AutoCloseable {
         }
         return json(out);
     }
-    private boolean alive(String token){String raw=claims.get(token);if(raw==null)return false;var c=J.obj(raw);long deadline=ownerEpoch.equals(text(c,"owner_epoch"))?Long.parseLong(text(c,"deadline_ns")):ownerStarted+Long.parseLong(text(c,"lease_ms"))*1000000;return System.nanoTime()<deadline;}
+    private boolean alive(String token){String raw=claims.get(token);if(raw==null)return false;var c=J.obj(raw);long deadline=ownerEpoch.equals(text(c,"owner_epoch"))?Long.parseLong(text(c,"deadline_ns")):ownerStarted+Long.parseLong(text(c,"lease_ms"))*1000000;return System.nanoTime()-deadline<0;}
     private String finish(String op,String... a){
         String raw=claims.get(a[0]);if(raw==null)return outcome("fenced-or-expired");var c=J.obj(raw);String ck=json(List.of(text(c,"work"),text(c,"item")));
         if(!a[0].equals(activeClaims.get(ck))||!alive(a[0]))return outcome("fenced-or-expired");
@@ -176,7 +183,7 @@ public final class Store implements AutoCloseable {
     }
 
     public synchronized Cursor query(String operation,String... args){
-        check();if(operation.equals("claim")){String r=call("claim",args);return new Cursor(((List<?>)J.parse(r)).iterator(),null);}
+        check();checkInputBudget(args);if(operation.equals("claim")){String r=call("claim",args);return new Cursor(((List<?>)J.parse(r)).iterator(),null);}
         Snapshot snapshot=snapshot();try{return snapshot.cursor(true,operation,args);}catch(RuntimeException e){snapshot.close();throw e;}
     }
     public synchronized Snapshot snapshot(){check();Snapshot s=new Snapshot();snapshots.add(s);return s;}
@@ -188,7 +195,7 @@ public final class Store implements AutoCloseable {
         private final MVMap<String,Long> aliasView;
         private boolean ended;
         Snapshot(){pin=db.registerVersionUsage();long version=db.getCurrentVersion();view=items.openVersion(version);fronts=frontier.openVersion(version);defs=differences.openVersion(version);aliasView=aliases.openVersion(version);}
-        public Cursor query(String query,String options){Map<String,Object> q=J.obj(query);keys(q,"ids","all");return cursor(false,Boolean.TRUE.equals(q.get("all"))?"select":"query_subset",namespace,json(q.getOrDefault("ids",List.of())),options);}
+        public Cursor query(String query,String options){checkInputBudget(query,options);Map<String,Object> q=J.obj(query);keys(q,"ids","all");return cursor(false,Boolean.TRUE.equals(q.get("all"))?"select":"query_subset",namespace,json(q.getOrDefault("ids",List.of())),options);}
         Cursor cursor(boolean ownSnapshot,String op,String... a){
             if(ended)throw new IllegalStateException("snapshot-closed");Iterator<?> source;
             if(op.equals("select")){source=view.entrySet().stream().map(e->decode(e.getValue())).iterator();}
@@ -276,7 +283,7 @@ public final class Store implements AutoCloseable {
         }catch(IOException e){throw new UncheckedIOException(e);}
     }
     private String restore(Path input){
-        if(!items.isEmpty())throw new IllegalArgumentException("import-requires-empty-registry");long rows=0;boolean end=false;
+        if(!items.isEmpty()||!events.isEmpty()||!aliases.isEmpty()||!differences.isEmpty()||!claims.isEmpty()||!replay.isEmpty())throw new IllegalArgumentException("import-requires-empty-registry");long rows=0;boolean end=false;
         try(var lines=Files.newBufferedReader(input)){
             String first=boundedLine(lines);if(first==null||!"snapshot".equals(text(J.obj(first),"kind"))||!"1".equals(J.text(J.obj(first),"format","")))throw new IllegalArgumentException("snapshot-header");
             String line;while((line=boundedLine(lines))!=null){Map<String,Object> r=J.obj(line);

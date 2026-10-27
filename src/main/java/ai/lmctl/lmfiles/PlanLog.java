@@ -18,13 +18,25 @@ public final class PlanLog {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))); }
         catch(NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
     }
-    public static String instructionDigest(Map<String,Object> instruction) { return sha(J.str(instruction.get("payload"))); }
+    public static String instructionDigest(Map<String,Object> instruction) { return sha(J.str(object(instruction.get("payload")))); }
     public static String append(Path path,String line,String options) throws IOException {
+        if(options!=null&&!options.isEmpty()){Map<String,Object> o=J.obj(options);for(String k:o.keySet())if(!k.equals("v"))throw new IllegalArgumentException("unknown option: "+k);}
         Map<String,Object> m=J.obj(line); m.remove("checksum"); validatePaths(m);
         m.put("checksum",crc(J.str(m))); byte[] data=(J.str(m)+"\n").getBytes(StandardCharsets.UTF_8);
         if(data.length>MAX_LINE)throw new IllegalArgumentException("journal-line-too-large");
         if(path.toAbsolutePath().getParent()!=null)Files.createDirectories(path.toAbsolutePath().getParent());
-        try(FileChannel c=FileChannel.open(path,StandardOpenOption.CREATE,StandardOpenOption.WRITE,StandardOpenOption.APPEND);FileLock ignored=c.lock()) {
+        try(FileChannel c=FileChannel.open(path,StandardOpenOption.CREATE,StandardOpenOption.READ,StandardOpenOption.WRITE);FileLock ignored=c.lock()) {
+            long size=c.size();
+            if(size>0) {
+                int window=(int)Math.min(size,MAX_LINE+1L);long start=size-window;
+                ByteBuffer tail=ByteBuffer.allocate(window);c.read(tail,start);tail.flip();
+                if(tail.get(window-1)!='\n') {
+                    int lastNl=-1;for(int i=window-1;i>=0;i--)if(tail.get(i)=='\n'){lastNl=i;break;}
+                    if(lastNl<0&&size>MAX_LINE)throw new IllegalArgumentException("journal-line-too-large");
+                    c.truncate(lastNl<0?0:start+lastNl+1);
+                }
+            }
+            c.position(c.size());
             ByteBuffer b=ByteBuffer.wrap(data);while(b.hasRemaining())c.write(b);c.force(true);
             String point="instruction".equals(m.get("kind"))?"after_plan_sync":"after_result_sync";
             if(point.equals(System.getenv("LMFILES_KILL_POINT")))Runtime.getRuntime().halt(77);
@@ -57,10 +69,14 @@ public final class PlanLog {
                 if(map.size()!=1)throw new IllegalArgumentException("path-encoding-tag");
                 byte[] bytes;
                 if(map.containsKey("base64")) {
-                    String b=Objects.toString(map.get("base64"));try{bytes=Base64.getDecoder().decode(b);}catch(IllegalArgumentException e){throw new IllegalArgumentException("invalid-path-base64");}
+                    if(!(map.get("base64") instanceof String b)||b.isEmpty())throw new IllegalArgumentException("invalid-path-base64");
+                    try{bytes=Base64.getDecoder().decode(b);}catch(IllegalArgumentException e){throw new IllegalArgumentException("invalid-path-base64");}
                     if(!Base64.getEncoder().encodeToString(bytes).equals(b))throw new IllegalArgumentException("noncanonical-path-base64");
                     try {StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes));throw new IllegalArgumentException("valid-utf8-path-requires-utf8-tag");}catch(CharacterCodingException expected){}
-                } else {try {ByteBuffer encoded=StandardCharsets.UTF_8.newEncoder().onMalformedInput(CodingErrorAction.REPORT).encode(java.nio.CharBuffer.wrap(Objects.toString(map.get("utf8"))));bytes=new byte[encoded.remaining()];encoded.get(bytes);}catch(CharacterCodingException e){throw new IllegalArgumentException("invalid-utf8-path");}}
+                } else {
+                    if(!(map.get("utf8") instanceof String u)||u.isEmpty())throw new IllegalArgumentException("invalid-utf8-path");
+                    try {ByteBuffer encoded=StandardCharsets.UTF_8.newEncoder().onMalformedInput(CodingErrorAction.REPORT).encode(java.nio.CharBuffer.wrap(u));bytes=new byte[encoded.remaining()];encoded.get(bytes);}catch(CharacterCodingException e){throw new IllegalArgumentException("invalid-utf8-path");}
+                }
                 for(byte b:bytes)if(b==0)throw new IllegalArgumentException("path-nul");
             } else for(Object x:map.values())validatePaths(x);
         } else if(v instanceof Collection<?> list)for(Object x:list)validatePaths(x);
@@ -71,7 +87,8 @@ public final class PlanLog {
         final Path path;final MVStore db;final MVMap<String,String> plans,results,completed;int buffered;
         Index(Path plan,Path result) throws IOException {
             path=Files.createTempFile("lmfiles-plan-index-",".mv");
-            db=new MVStore.Builder().fileName(path.toString()).cacheSize(8).autoCommitDisabled().open();
+            int cache=(int)Math.max(1,Math.min(8,Main.memoryBudget()/(4L*1024*1024)));
+            db=new MVStore.Builder().fileName(path.toString()).cacheSize(cache).autoCommitDisabled().open();
             plans=db.openMap("plans");results=db.openMap("results");completed=db.openMap("completed");
             try {
                 read(plan,m->{if(!"instruction".equals(m.get("kind")))throw new IllegalArgumentException("plan-kind");String k=key(m),v=J.str(m);String old=plans.putIfAbsent(k,v);if(old!=null&&!old.equals(v))throw new IllegalArgumentException("plan-op-conflict");if(++buffered%64==0)db.commit();});
@@ -113,6 +130,12 @@ public final class PlanLog {
     public static String apply(Store store,Path plan,Path results) throws IOException {
         long[] applied={0},duplicates={0};
         try(Index index=new Index(plan,results)) {
+            read(results,m->{
+                Map<String,Object> p=object(m.get("payload"));if(!Boolean.TRUE.equals(p.get("confirmed")))return;
+                String key=J.str(List.of(J.text(m,"job",""),J.text(m,"result_id",""))),digest=sha(J.str(m));
+                String old=J.text(J.obj(store.call("replay_seen",key)),"digest","");
+                if(!old.isEmpty()&&!old.equals(digest))throw new IllegalArgumentException("persisted-result-conflict");
+            });
             read(results,m->{
                 index.check(m);Map<String,Object> p=object(m.get("payload"));if(!Boolean.TRUE.equals(p.get("confirmed")))return;
                 String key=J.str(List.of(J.text(m,"job",""),J.text(m,"result_id",""))),digest=sha(J.str(m));

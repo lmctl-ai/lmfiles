@@ -32,13 +32,28 @@ public final class CoreChecks {
    reject(()->s.call("observe","9999","{\"present\":true}"),"unknown observation");reject(()->s.call("stage_forget","9999","x","y",""),"unknown stage item");
    reject(()->s.query("query_subset","checks","[\""+one+"\"]","{\"stage\":\"cleaned\",\"namespace\":\"clean\",\"projection\":\"last_success\"}").nextJson(0,100),"zero cursor rows");reject(()->s.query("query_subset","checks","[\""+one+"\"]","{\"stage\":\"cleaned\",\"namespace\":\"clean\",\"projection\":\"last_success\"}").nextJson(1,2),"oversize cursor row");
    String cp2=page(s.query("claim","{\"difference\":\"fetch-clean\"}","worker","1","1000","w2"));ok(!cp2.equals("[]"),"reissued claim");Map<String,Object> cr2=(Map<String,Object>)((List<?>)J.parse(cp2)).get(0);String t2=J.text(cr2,"token","");ok("fenced-or-expired".equals(st(s.call("complete",token,sr("cleaned","clean","ok","3"),J.text(cr2,"source_revision","")))),"old token fenced after reissue");ok("conflict".equals(st(s.call("complete",t2,sr("cleaned","clean","ok","future"),J.text(cr2,"source_revision","")))),"future source revision conflict");
-   try(Store.Batch b=s.begin()){b.add("{\"op\":\"item_upsert\",\"args\":[\"{\\\"id\\\":\\\"txn-item\\\"}\",\"{}\"]}");b.add("{\"op\":\"malformed\",\"args\":[]}");reject(b::commit,"malformed batch");}ok(page(s.query("query_subset","checks","[\"txn-item\"]","{}")).contains("unknown"),"batch rollback verdict");String next=id(s.call("item_upsert","{\"id\":\"after-batch\"}","{}"));ok(next.equals("3"),"sequence restored after abort");Store.Snapshot snap=s.snapshot();String before=page(snap.query("{\"all\":true}","{}"));s.call("item_upsert","{\"id\":\"after-snapshot\"}","{}");ok(before.equals(page(snap.query("{\"all\":true}","{}"))),"snapshot stable");snap.close();ok("ok".equals(st(s.call("doctor"))),"doctor");
+   try(Store.Batch b=s.begin()){b.add("{\"op\":\"item_upsert\",\"args\":[\"{\\\"id\\\":\\\"txn-item\\\"}\",\"{}\"]}");b.add("{\"op\":\"malformed\",\"args\":[]}");reject(b::commit,"malformed batch");}ok(page(s.query("query_subset","checks","[\"txn-item\"]","{}")).contains("unknown"),"batch rollback verdict");String next=id(s.call("item_upsert","{\"id\":\"after-batch\"}","{}"));ok(next.equals("3"),"sequence restored after abort");Store.Snapshot snap=s.snapshot();String before=page(snap.query("{\"all\":true}","{}"));s.call("item_upsert","{\"id\":\"after-snapshot\"}","{}");ok(before.equals(page(snap.query("{\"all\":true}","{}"))),"snapshot stable");snap.close();
+   reject(()->s.call("alias_add",one,"{\"kind\":\"identity\",\"namespace\":\"checks\",\"value\":\"law-1\"}"),"reserved identity alias kind");
+   reject(()->s.call("observe",one,"{\"present\":\"no\"}"),"non-boolean present");
+   reject(()->s.call("difference_index",A,"{\"stage\":\"cleaned\",\"namespace\":\"clean\",\"projection\":\"bad\"}","{\"id\":\"bad-proj\"}"),"invalid index selector projection");
+   reject(()->s.call("doctor","{\"unknown\":true}"),"unknown doctor option");
+   reject(()->{try(Store s2=new Store(db,"checks","{}")){}catch(Exception e){throw e instanceof RuntimeException r?r:new RuntimeException(e);}},"same-process writer lock");
+   String five=id(s.call("item_upsert","{\"id\":\"stat-drift\"}","{\"content_hash\":\"h1\",\"size\":\"10\"}"));
+   s.call("observe",five,"{\"present\":true,\"size\":10,\"hash\":\"h1\"}");
+   s.call("stage_record",five,"{\"stage\":\"published\",\"namespace\":\"site\",\"status\":\"ok\",\"source_revision\":\"1\",\"source_fingerprint\":{\"hash\":\"h1\"}}");
+   ok(page(s.query("query_subset","site","[\""+five+"\"]","{\"stage\":\"published\",\"namespace\":\"site\",\"projection\":\"last_success\"}")).contains("\"state\":\"same-as-recorded\""),"initial digest match");
+   s.call("observe",five,"{\"present\":true,\"size\":20}");
+   ok(page(s.query("query_subset","site","[\""+five+"\"]","{\"stage\":\"published\",\"namespace\":\"site\",\"projection\":\"last_success\"}")).contains("\"state\":\"changed\""),"stat-only drift clears stale hash");
+   s.call("stage_record",five,sr("verify","site","failed","2"));
+   s.call("stage_record",five,sr("verify","site","ok","1"));
+   ok(page(s.query("query_subset","site","[\""+five+"\"]","{\"stage\":\"verify\",\"namespace\":\"site\",\"projection\":\"last_success\"}")).contains("\"source_revision\":\"1\""),"late ok populates last_success under newer failed attempt");
+   ok("ok".equals(st(s.call("doctor"))),"doctor");
   }
   try(Store s=new Store(db,"checks","{}")){ok(!page(s.query("query_subset","checks","[\"1\"]","{}")).equals("[]"),"reopen");}
   Path snapshot=root.resolve("snapshot.jsonl");Files.deleteIfExists(snapshot);
   try(Store s=new Store(db,"checks","{}")){ok(st(s.call("export_records",snapshot.toString(),"{}")).equals("ok"),"snapshot export");}
   Path restored=root.resolve("restored.mv");Files.deleteIfExists(restored);
-  try(Store s=new Store(restored,"checks","{}")){ok(st(s.call("import_records",snapshot.toString())).equals("ok"),"snapshot import");ok(J.text(m(s.call("doctor")),"items","").equals("4"),"all snapshot items restored");}
+  try(Store s=new Store(restored,"checks","{}")){ok(st(s.call("import_records",snapshot.toString())).equals("ok"),"snapshot import");ok(J.text(m(s.call("doctor")),"items","").equals("5"),"all snapshot items restored");}
   Path truncated=root.resolve("truncated.jsonl");String exported=Files.readString(snapshot);Files.writeString(truncated,exported.substring(0,exported.lastIndexOf("{\"kind\":\"end\"")));
   Path rejected=root.resolve("rejected.mv");Files.deleteIfExists(rejected);
   try(Store s=new Store(rejected,"checks","{}")){reject(()->s.call("import_records",truncated.toString()),"truncated snapshot");ok(J.text(m(s.call("doctor")),"items","").equals("0"),"failed import rolls back");}
