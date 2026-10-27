@@ -21,7 +21,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='lmfiles-sftp-test-') as tmp:
         work=pathlib.Path(tmp);ready=work/'fixture.json';stop=work/'stop'
         text=(ROOT/'examples/sftp_registry.lms').read_text();code=json.JSONDecoder().raw_decode(text.split('let FIXTURE=',1)[1])[0]
-        daemon=subprocess.Popen(['python3','-c',code,str(ready),str(stop)],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+        daemon=subprocess.Popen(['python3','-c',code,str(ready),str(stop),'240'],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
         try:
             for _ in range(100):
                 if ready.is_file():break
@@ -50,22 +50,15 @@ def main():
                 chunk=b'synthetic-payload-'*4096
                 for _ in range(1024):f.write(chunk)
             size=big.stat().st_size;target=remote.parent/'big.partial';target.write_bytes(b'')
-            def program(batch,path,hash_output=None):
-                source=work/(path+'.lms');bytecode=work/(path+'.dslb')
-                body=f'''let p=_lmcode_ cli="lmssh" install="github:lmctl-ai/lmssh@latest";
-let s=ssh.connect({json.dumps(config['dest'])}).port({config['port']}).config("/dev/null").identity({json.dumps(config['identity'])}).known_hosts({json.dumps(config['known_hosts'])}).strict_host_key("yes").timeout(120);
-s.sftp({json.dumps(batch)}).require();
-'''
-                if hash_output:body+='io.write('+json.dumps(str(hash_output))+',io.sha256('+json.dumps(str(work/'received.partial'))+'));\n'
-                body+='s.close();\nend _lmcode_\nsavedsl(p,'+json.dumps(str(bytecode))+');\n'
-                source.write_text(body)
-                compiled=subprocess.run(['lmscript',str(source)],cwd=work,text=True,capture_output=True,timeout=30)
-                assert compiled.returncode==0,(compiled.stdout,compiled.stderr)
-                return [shutil.which('lmssh'),'--dsl',str(bytecode)]
-            quote=lambda p:'"'+str(p).replace('\\','\\\\').replace('"','\\"')+'"'
-            def interrupt_and_resume(command,partial):
-                p=subprocess.Popen(command,cwd=work,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
-                until=time.monotonic()+15;observed=0
+            def stop_tree(p):
+                for pid in children(p.pid):
+                    try:os.killpg(pid,signal.SIGKILL)
+                    except ProcessLookupError:pass
+                if p.poll() is None:p.kill()
+                p.wait(timeout=5)
+            def interrupted_job(partial):
+                p=subprocess.Popen(['lmscript',str(ROOT/'examples/sftp_registry.lms'),str(ready)],cwd=work,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+                until=time.monotonic()+45
                 try:
                     while time.monotonic()<until:
                         observed=partial.stat().st_size if partial.exists() else 0
@@ -73,27 +66,30 @@ s.sftp({json.dumps(batch)}).require();
                         assert p.poll() is None,p.communicate()
                         time.sleep(.001)
                     assert 0<observed<size,('no partial observed',observed,size)
-                    for pid in children(p.pid):
-                        try:os.killpg(pid,signal.SIGKILL)
-                        except ProcessLookupError:pass
-                    if p.poll() is None:p.kill()
-                    p.wait(timeout=5)
-                    # Partial must remain incomplete after the killed client has settled.
-                    time.sleep(.05);partial_size=partial.stat().st_size
+                    stop_tree(p);time.sleep(.05)
+                    partial_size=partial.stat().st_size
                     assert 0<partial_size<size,(partial_size,size)
-                    result=subprocess.run(command,cwd=work,text=True,capture_output=True,timeout=120)
-                    assert result.returncode==0,(result.stdout,result.stderr)
-                    assert partial.stat().st_size==size
                     return partial_size
                 finally:
-                    if p.poll() is None:p.kill();p.wait(timeout=5)
-            put=program('reput -p '+quote(big)+' '+quote(target)+'\n','resume-put')
-            uploaded_partial=interrupt_and_resume(put,target);checks+=1
-            assert hashlib.sha256(big.read_bytes()).digest()==hashlib.sha256(target.read_bytes()).digest();checks+=1
-            received=work/'received.partial';hashfile=work/'received.sha'
-            get=program('reget -p '+quote(target)+' '+quote(received)+'\n','resume-get',hashfile)
-            downloaded_partial=interrupt_and_resume(get,received);checks+=1
-            assert hashfile.read_text()==hashlib.sha256(big.read_bytes()).hexdigest();checks+=1
+                    if p.poll() is None:stop_tree(p)
+                    p.communicate(timeout=5)
+            def stage_status(stage):
+                item=json.loads((work/'.lmfiles-local/sftp/item.json').read_text())['item']
+                ns=config['dest']+':'+str(config['port'])
+                r=subprocess.run(['lmfiles','--query',str(work/'.lmfiles-local/sftp/state.mv'),'query_subset','sftp',json.dumps([item]),json.dumps(dict(stage=stage,namespace=ns,projection='last_success'))],capture_output=True,text=True,timeout=30,check=True)
+                return json.loads(r.stdout)[0]['recorded'].get('status')
+            upload_config=dict(config,local=str(big),remote=str(remote.parent/'large-upload.txt'))
+            ready.write_text(json.dumps(upload_config));upload_partial=pathlib.Path(upload_config['remote']+'.lmfiles-partial')
+            uploaded_partial=interrupted_job(upload_partial)
+            assert stage_status('published') is None;checks+=1
+            job((1,1));checks+=1
+            assert hashlib.sha256(big.read_bytes()).digest()==hashlib.sha256(pathlib.Path(upload_config['remote']).read_bytes()).digest();checks+=1
+            download_config=dict(config,local=str(big),remote=str(remote.parent/'large-download.txt'))
+            ready.write_text(json.dumps(download_config));received=work/'.lmfiles-local/sftp/downloaded.txt.partial'
+            downloaded_partial=interrupted_job(received)
+            assert stage_status('published')=='ok' and stage_status('downloaded') is None;checks+=1
+            job((0,1));checks+=1
+            assert hashlib.sha256(big.read_bytes()).digest()==hashlib.sha256((work/'.lmfiles-local/sftp/downloaded.txt').read_bytes()).digest();checks+=1
             if args.gallery:
                 # Regenerate a truthful non-noop picture with a fresh item.
                 fresh=dict(config,remote=str(remote.parent/'gallery.txt'));ready.write_text(json.dumps(fresh));job((1,1))

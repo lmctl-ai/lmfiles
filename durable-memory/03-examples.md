@@ -1,6 +1,6 @@
 # Examples
 
-Six self-executing .lms jobs create synthetic artifacts and images. frontier,
+Nine self-executing .lms jobs create synthetic artifacts and images. frontier,
 revisions, claims, snapshots and journal_resume reset only their private synthetic
 fixture DBs. publish_ttl keeps state: repeat run is no-op; changed selects one
 revision; uncertain deliberately omits a result, so the next run retries it.
@@ -27,7 +27,7 @@ and records outcomes/failure counts. `scripts/test-pairings.py`:11 checks.
 `sftp_registry.lms` uses released lmssh 0.1.1 and a private temporary sshd (Python3,
 ssh-keygen and installed sshd required). Strict known_hosts, reput/reget -p,
 temporary names, rename, and query-driven skips; no remote listing/checksum calls.
-`scripts/test-sftp.py`:9 Linux checks including actual upload/download interruption
+`scripts/test-sftp.py`:11 Linux checks including actual upload/download job interruption
 and resume, digest validation, local corruption and host-key refusal. A new remote
 partial must first be created: only reput's explicit missing-remote error selects
 initial put; other failures remain failures. All fixtures are temporary/synthetic.
