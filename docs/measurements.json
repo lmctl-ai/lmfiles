@@ -1,0 +1,33 @@
+{
+  "build_seconds": 4.089950008,
+  "bytes_per_item": 1507.328,
+  "disk_bytes": "15073280",
+  "doctor": {
+    "events": "60100",
+    "examined": "100",
+    "items": "10000",
+    "status": "ok",
+    "storage": "MVStore positional I/O, compressed CRC32C binary records"
+  },
+  "items": 10000,
+  "pending": 100,
+  "profile": "three explicit aliases plus identity index, five stages, six events/item before pending updates; compact synthetic metadata",
+  "reopen_query_ms": 3.711413,
+  "scope": "local measured workload, not 100M qualification",
+  "subset_queries": 1000,
+  "subset_query_ms": 73.082747,
+  "measured_code_commit": "45d4324578903b15d19f28b330d06859d22d05da",
+  "platform": "linux-x64 glibc 2.35",
+  "toolchain": "GraalVM CE 25.0.2+10.1",
+  "native_bytes": 28510472,
+  "native_sha256": "248badcb03eb194f4c200e2490d4fd4c0fb035aaaf273e4ecf77f7cefcff0e75",
+  "max_rss_kib": 72684,
+  "core_assertions": 55,
+  "journal_assertions": 13,
+  "process_checks": 17,
+  "fault_points": 9,
+  "gallery_jobs": 6,
+  "publication_scenarios": 6,
+  "public_readme_urls_verified": 6,
+  "real_cloud_requests": 0
+}

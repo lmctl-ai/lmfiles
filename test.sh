@@ -58,7 +58,7 @@ if LMFILES_MAX_MEMORY_MB=invalid "${host[@]}" --version >/dev/null 2>"$fixture/m
 fi
 grep -q 'LMFILES_MAX_MEMORY_MB' "$fixture/memory.err"
 
-if (( native == 1 )) && command -v readelf >/dev/null 2>&1; then
+if (( native == 1 )) && [[ "$(uname -s)" == Linux ]] && command -v readelf >/dev/null 2>&1; then
   readelf -d "$binary" | awk '/NEEDED/{gsub(/[\[\]]/,"",$5);print $5}' > "$fixture/needed"
   while read -r lib; do
     case "$lib" in

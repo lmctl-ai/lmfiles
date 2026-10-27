@@ -7,3 +7,4 @@
 - [../docs/API.md](../docs/API.md): current JSON contracts and implemented schema subset.
 - [../docs/JOURNAL.md](../docs/JOURNAL.md): optional plan/result codec and confirmation gap.
 - [../docs/MEASUREMENTS.md](../docs/MEASUREMENTS.md): measured size/latency/test evidence.
+- [../docs/measurements.json](../docs/measurements.json): synthetic local measurements and exact native digest.

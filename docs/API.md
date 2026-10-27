@@ -4,8 +4,8 @@ The generated schema is authoritative. Context `registry.open(path, namespace,
 options_json)` returns Registry. Options accept v and cache_mb (1..64; at most
 half LMFILES_MAX_MEMORY_MB). Unknown option keys fail explicitly.
 
-All IDs and revisions in JSON are decimal strings. Item numbers are dense u64
-values within this local DB; do not mix IDs between DBs. Metadata is caller data.
+All IDs and revisions in JSON are decimal strings. Item numbers are dense positive 64-bit
+values (1..Long.MAX_VALUE) within this local DB; do not mix IDs between DBs. Metadata is caller data.
 
 | Method | JSON contract |
 |---|---|
@@ -41,3 +41,7 @@ Deferred 1C: arbitrary indexed attribute/hash/time/group queries, local tree sca
 full event change-cursor API/checkpoints/archive management, multi-process owner
 mailbox, large-tier index/codec qualification and raw file download/provider gaps.
 No stub functions claim to implement those capabilities.
+
+Operational limits: individual decoded records <=1MiB and <=a quarter of the
+configured memory budget; batches <=16MiB and <=a quarter of budget. Snapshot
+import rejects oversized lines, missing footer and checksum failures.

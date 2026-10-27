@@ -58,7 +58,7 @@ end _lmcode_
     savedsl(transfer,"build/publish-transfer.dslb");
     let sent=system(concat(dsl_cli(transfer),["--dsl","build/publish-transfer.dslb"]),120000); assert(sent.code==0);
     # A deterministic persistent local S3-like artifact for verification of the fake job.
-    write_file(ROOT + "/fake-bucket/" + KEY, BODY);
+    assert(write_file(ROOT + "/fake-bucket/" + KEY, BODY));
     if (!(MODE == "uncertain" && i == 0)) {
       let receipt={v:1,kind:"result",job:"publish-ttl",op:operation.op,result_id:operation.op+"-confirmed",completes_instruction:true,payload:{instruction_digest:read_file(ROOT+"/digest.txt"),confirmed:true,projection:{kind:"record",item:ITEM,stage:"published",target:"fake-s3",status:"ok",source_revision:REV,source_fingerprint:FINGERPRINT,metadata:{key:KEY,cache_control:"max-age=60",synthetic:true}}}};
       let RECEIPT=json_stringify(receipt);
