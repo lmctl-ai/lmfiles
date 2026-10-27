@@ -1,7 +1,7 @@
 # Snapshot isolation: ten items are captured, then five more are added.
 mkdir(".lmfiles-local"); mkdir(".lmfiles-local/snapshots"); mkdir("images"); mkdir("build");
 if (file_exists(".lmfiles-local/snapshots/state.mv")) { remove_file(".lmfiles-local/snapshots/state.mv"); }
-let state = _lmcode_ cli="lmfiles";
+let state = _lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
 let db = registry.open(".lmfiles-local/snapshots/state.mv", "snapshots", "{}");
 for (i in range(0, 10)) { db.item_upsert("{\"id\":\"archive-" + str(i) + "\"}", "{\"source\":\"synthetic\"}"); }
 let snap = db.snapshot();

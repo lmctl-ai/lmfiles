@@ -1,7 +1,7 @@
 # Synthetic frontier: 20 fetched records, 14 cleaned records, six pending.
 mkdir(".lmfiles-local"); mkdir(".lmfiles-local/frontier"); mkdir("images"); mkdir("build");
 if (file_exists(".lmfiles-local/frontier/state.mv")) { remove_file(".lmfiles-local/frontier/state.mv"); }
-let state = _lmcode_ cli="lmfiles";
+let state = _lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
 let db = registry.open(".lmfiles-local/frontier/state.mv", "frontier", "{}");
 for (i in range(0, 20)) {
   db.item_upsert("{\"id\":\"law-" + str(i) + "\"}", "{\"source\":\"synthetic\"}");

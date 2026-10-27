@@ -12,7 +12,7 @@ let bodies = [first, "Synthetic case B, stable text.\n"];
 let FIELDS_A = json_stringify({content_hash:sha256(bodies[0]),size:str(bodies[0].len())});
 let FIELDS_B = json_stringify({content_hash:sha256(bodies[1]),size:str(bodies[1].len())});
 let HAS_LOGS = file_exists(PLAN) && file_exists(RESULTS);
-let init = _lmcode_ cli="lmfiles";
+let init = _lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
 let db = registry.open(${DB}, "publish-ttl", "{}");
 if (${HAS_LOGS}) { db.apply_records(${PLAN}, ${RESULTS}, "{}"); }
 let a = db.item_upsert("{\"id\":\"law-a\"}", ${FIELDS_A});
@@ -41,7 +41,7 @@ for (i in range(0, 2)) {
     let FINGERPRINT = {hash:sha256(BODY),size:str(BODY.len())};
     let operation = {v:1,kind:"instruction",job:"publish-ttl",op:"put-"+ITEM+"-r"+REV,payload:{verb:"put",item:ITEM,stage:"published",target:"fake-s3",source_revision:REV,source_fingerprint:FINGERPRINT,args:{key:KEY,cache_control:"max-age=60"},record_projection:"record"}};
     let LINE = json_stringify(operation);
-    let prepare = _lmcode_ cli="lmfiles";
+    let prepare = _lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
     registry.log_append(${PLAN}, ${LINE}, "{}");
     file_write(".lmfiles-local/publish-ttl/digest.txt", registry.instruction_digest(${LINE}));
 end _lmcode_
@@ -62,7 +62,7 @@ end _lmcode_
     if (!(MODE == "uncertain" && i == 0)) {
       let receipt={v:1,kind:"result",job:"publish-ttl",op:operation.op,result_id:operation.op+"-confirmed",completes_instruction:true,payload:{instruction_digest:read_file(ROOT+"/digest.txt"),confirmed:true,projection:{kind:"record",item:ITEM,stage:"published",target:"fake-s3",status:"ok",source_revision:REV,source_fingerprint:FINGERPRINT,metadata:{key:KEY,cache_control:"max-age=60",synthetic:true}}}};
       let RECEIPT=json_stringify(receipt);
-      let log = _lmcode_ cli="lmfiles";
+      let log = _lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
       registry.log_append(${RESULTS}, ${RECEIPT}, "{}");
 end _lmcode_
       savedsl(log,"build/publish-log.dslb");
@@ -71,7 +71,7 @@ end _lmcode_
     }
   }
 }
-let replay = _lmcode_ cli="lmfiles";
+let replay = _lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
 let db=registry.open(${DB},"publish-ttl","{}");
 db.apply_records(${PLAN},${RESULTS},"{}");
 registry.unconfirmed(${PLAN},${RESULTS},".lmfiles-local/publish-ttl/unconfirmed.jsonl");

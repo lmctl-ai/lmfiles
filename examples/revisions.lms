@@ -1,7 +1,7 @@
 # Synthetic revision tracking: three published records become stale after a new observation.
 mkdir(".lmfiles-local"); mkdir(".lmfiles-local/revisions"); mkdir("images"); mkdir("build");
 if (file_exists(".lmfiles-local/revisions/state.mv")) { remove_file(".lmfiles-local/revisions/state.mv"); }
-let state = _lmcode_ cli="lmfiles";
+let state = _lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
 let db = registry.open(".lmfiles-local/revisions/state.mv", "revisions", "{}");
 for (i in range(0, 10)) {
   db.item_upsert("{\"id\":\"case-" + str(i) + "\"}", "{\"source\":\"synthetic\",\"content_hash\":\"source-1\"}");

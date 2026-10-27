@@ -3,7 +3,7 @@ mkdir(".lmfiles-local"); mkdir(".lmfiles-local/journal-resume"); mkdir("images")
 if (file_exists(".lmfiles-local/journal-resume/state.mv")) { remove_file(".lmfiles-local/journal-resume/state.mv"); }
 if (file_exists(".lmfiles-local/journal-resume/plan.jsonl")) { remove_file(".lmfiles-local/journal-resume/plan.jsonl"); }
 if (file_exists(".lmfiles-local/journal-resume/results.jsonl")) { remove_file(".lmfiles-local/journal-resume/results.jsonl"); }
-let state = _lmcode_ cli="lmfiles";
+let state = _lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
 let db = registry.open(".lmfiles-local/journal-resume/state.mv", "journal", "{}");
 db.item_upsert("{\"id\":\"journal-1\"}", "{\"source\":\"synthetic\"}");
 db.item_upsert("{\"id\":\"journal-2\"}", "{\"source\":\"synthetic\"}");
