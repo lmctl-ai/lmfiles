@@ -9,7 +9,7 @@ public final class J {
     public static Object parse(String text) { return Json.parse(text); }
     public static Map<String,Object> obj(String text) { return Json.object(parse(text)); }
     public static String text(Map<?,?> map,String name,String fallback) {
-        Object value=map.get(name); return value==null?fallback:value.toString();
+        Object value=map.get(name); return value==null?fallback:value instanceof Number n?new java.math.BigDecimal(n.toString()).stripTrailingZeros().toPlainString():value.toString();
     }
     public static String str(Object value) {
         if(value==null)return "null";

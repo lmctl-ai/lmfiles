@@ -1,0 +1,23 @@
+lmfiles 0.1.0 — Copyright (c) 2026 Lattice Systems LLC. MIT licensed.
+
+lmcode-java v0.1.1, Copyright Lattice Systems LLC, MIT license.
+The exact upstream MIT text is embedded in licenses/lmcode-java/LICENSE.
+Sources are pinned by sdk.lock and verified by scripts/sync-sdk.py.
+
+H2 MVStore 2.3.232 (com.h2database:h2).
+Copyright (c) 2004-2024 H2 Group. All rights reserved.
+H2 is dual licensed under the Mozilla Public License 2.0 and Eclipse Public
+License 1.0. This distribution elects MPL 2.0. Unmodified H2 source is available
+at https://github.com/h2database/h2database/tree/version-2.3.232
+The complete MPL 2.0 text accompanies this notice in licenses/MPL-2.0.txt.
+No H2 JDBC drivers or database servers are exposed by lmfiles.
+
+Linux native binaries link dynamically to glibc (baseline >=2.35 on Ubuntu 22.04)
+and bundle their other native-image runtime support. macOS uses system libraries;
+Windows uses the native-image runtime platform support. lmfiles adds no JNI,
+C/C++ component, native database library, cloud SDK or SSH client.
+
+GraalVM Community / OpenJDK native-image runtime: GPLv2 with Classpath Exception.
+Copyright Oracle and contributors. Complete license/assembly exception texts are
+embedded in licenses/GPLv2-Classpath.txt and licenses/ASSEMBLY_EXCEPTION.
+Dynamic system glibc is LGPL-2.1-or-later; no relinkable glibc objects are bundled.

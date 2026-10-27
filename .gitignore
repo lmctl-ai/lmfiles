@@ -5,3 +5,7 @@
 *.dslb
 *.db
 *.db.*
+
+/build/
+/images/
+__pycache__/
