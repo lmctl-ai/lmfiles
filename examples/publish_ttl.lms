@@ -1,0 +1,93 @@
+# One local/fake publish job. Requires the unreleased lmfiles build on PATH.
+# No AWS profile, credentials, endpoints or subscription are used.
+# Optional arguments: changed (one new revision), uncertain (omit its receipt).
+let MODE = ARGV.len() > 0 ? ARGV[0] : "normal";
+mkdir(".lmfiles-local"); mkdir(".lmfiles-local/publish-ttl"); mkdir(".lmfiles-local/publish-ttl/fake-bucket"); mkdir("images"); mkdir("build");
+let ROOT = ".lmfiles-local/publish-ttl";
+let DB = ROOT + "/state.mv";
+let PLAN = ROOT + "/plan.jsonl";
+let RESULTS = ROOT + "/results.jsonl";
+let first = MODE == "changed" || MODE == "uncertain" ? "Synthetic law A, corrected text.\n" : "Synthetic law A, original text.\n";
+let bodies = [first, "Synthetic case B, stable text.\n"];
+let FIELDS_A = json_stringify({content_hash:sha256(bodies[0]),size:str(bodies[0].len())});
+let FIELDS_B = json_stringify({content_hash:sha256(bodies[1]),size:str(bodies[1].len())});
+let HAS_LOGS = file_exists(PLAN) && file_exists(RESULTS);
+let init = _lmcode_ cli="lmfiles";
+let db = registry.open(${DB}, "publish-ttl", "{}");
+if (${HAS_LOGS}) { db.apply_records(${PLAN}, ${RESULTS}, "{}"); }
+let a = db.item_upsert("{\"id\":\"law-a\"}", ${FIELDS_A});
+let b = db.item_upsert("{\"id\":\"case-b\"}", ${FIELDS_B});
+file_write(".lmfiles-local/publish-ttl/items.json", "[" + a + "," + b + "]");
+let rows = db.query_subset("fake-s3", "[\"1\",\"2\"]", "{\"stage\":\"published\",\"namespace\":\"fake-s3\",\"projection\":\"last_success\"}");
+file_write(".lmfiles-local/publish-ttl/query.json", rows.next_json(10,1048576));
+rows.close(); db.close();
+end _lmcode_
+savedsl(init, "build/publish-init.dslb");
+let initialized = system(concat(dsl_cli(init), ["--dsl", "build/publish-init.dslb"]), 120000);
+assert(initialized.code == 0);
+let items = read_json(ROOT + "/items.json");
+let states = read_json(ROOT + "/query.json");
+# Prior confirmed results have been replayed; replacing this job's plan is safe.
+write_file(PLAN, ""); write_file(RESULTS, "");
+let selected = 0;
+let confirmed = 0;
+for (i in range(0, 2)) {
+  if (states[i].state != "same-as-recorded") {
+    selected = selected + 1;
+    let ITEM = items[i].item;
+    let REV = items[i].revision;
+    let BODY = bodies[i];
+    let KEY = i == 0 ? "law-a.html" : "case-b.html";
+    let FINGERPRINT = {hash:sha256(BODY),size:str(BODY.len())};
+    let operation = {v:1,kind:"instruction",job:"publish-ttl",op:"put-"+ITEM+"-r"+REV,payload:{verb:"put",item:ITEM,stage:"published",target:"fake-s3",source_revision:REV,source_fingerprint:FINGERPRINT,args:{key:KEY,cache_control:"max-age=60"},record_projection:"record"}};
+    let LINE = json_stringify(operation);
+    let prepare = _lmcode_ cli="lmfiles";
+    registry.log_append(${PLAN}, ${LINE}, "{}");
+    file_write(".lmfiles-local/publish-ttl/digest.txt", registry.instruction_digest(${LINE}));
+end _lmcode_
+    savedsl(prepare,"build/publish-prepare.dslb");
+    let prepared=system(concat(dsl_cli(prepare),["--dsl","build/publish-prepare.dslb"]),120000); assert(prepared.code==0);
+    # Existing lmaws second host, explicitly synthetic. This host owns no real resources.
+    let transfer = _lmcode_ cli="lmaws" install="github:lmctl-ai/lmaws@latest";
+    let cloud = aws.demo();
+    let run = cloud.example_run();
+    let bucket = run.bucket("lmfiles-fixture");
+    run.put(bucket, ${KEY}, ${BODY});
+    run.cleanup();
+end _lmcode_
+    savedsl(transfer,"build/publish-transfer.dslb");
+    let sent=system(concat(dsl_cli(transfer),["--dsl","build/publish-transfer.dslb"]),120000); assert(sent.code==0);
+    # A deterministic persistent local S3-like artifact for verification of the fake job.
+    write_file(ROOT + "/fake-bucket/" + KEY, BODY);
+    if (!(MODE == "uncertain" && i == 0)) {
+      let receipt={v:1,kind:"result",job:"publish-ttl",op:operation.op,result_id:operation.op+"-confirmed",completes_instruction:true,payload:{instruction_digest:read_file(ROOT+"/digest.txt"),confirmed:true,projection:{kind:"record",item:ITEM,stage:"published",target:"fake-s3",status:"ok",source_revision:REV,source_fingerprint:FINGERPRINT,metadata:{key:KEY,cache_control:"max-age=60",synthetic:true}}}};
+      let RECEIPT=json_stringify(receipt);
+      let log = _lmcode_ cli="lmfiles";
+      registry.log_append(${RESULTS}, ${RECEIPT}, "{}");
+end _lmcode_
+      savedsl(log,"build/publish-log.dslb");
+      let logged=system(concat(dsl_cli(log),["--dsl","build/publish-log.dslb"]),120000); assert(logged.code==0);
+      confirmed=confirmed+1;
+    }
+  }
+}
+let replay = _lmcode_ cli="lmfiles";
+let db=registry.open(${DB},"publish-ttl","{}");
+db.apply_records(${PLAN},${RESULTS},"{}");
+registry.unconfirmed(${PLAN},${RESULTS},".lmfiles-local/publish-ttl/unconfirmed.jsonl");
+db.close();
+end _lmcode_
+savedsl(replay,"build/publish-replay.dslb");
+let replayed=system(concat(dsl_cli(replay),["--dsl","build/publish-replay.dslb"]),120000); assert(replayed.code==0);
+write_file(ROOT+"/report.json",json_stringify({selected:selected,confirmed:confirmed,unconfirmed:selected-confirmed,mode:MODE,real_requests:0}));
+let DATA="selected "+str(selected)+"\nconfirmed "+str(confirmed)+"\nunconfirmed "+str(selected-confirmed)+"\n";
+let plot = _lmcode_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+plot.png("images/publish_ttl.png",900,520);
+plot.data("COUNTS",${DATA});
+plot.cmd("set title 'Local fake publication: receipts decide recorded state'; set ylabel 'files'; set yrange [0:3]; set style data histograms; set style fill solid 0.75; set boxwidth 0.65; set grid ytics; plot $COUNTS using 2:xtic(1) lc rgb '#2563eb' notitle");
+plot.close();
+end _lmcode_
+savedsl(plot,"build/publish-plot.dslb");
+let plotted=system(concat(dsl_cli(plot),["--dsl","build/publish-plot.dslb"]),120000); assert(plotted.code==0);
+println("selected="+str(selected)+", confirmed="+str(confirmed)+", unconfirmed="+str(selected-confirmed));
+println("estimated cost: $0.00 (local fakes only)");

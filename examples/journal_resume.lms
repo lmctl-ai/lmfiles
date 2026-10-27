@@ -1,0 +1,38 @@
+# Synthetic plan/result replay: two planned publications, one confirmed, one resumable.
+mkdir(".lmfiles-local"); mkdir(".lmfiles-local/journal-resume"); mkdir("images"); mkdir("build");
+if (file_exists(".lmfiles-local/journal-resume/state.mv")) { remove_file(".lmfiles-local/journal-resume/state.mv"); }
+if (file_exists(".lmfiles-local/journal-resume/plan.jsonl")) { remove_file(".lmfiles-local/journal-resume/plan.jsonl"); }
+if (file_exists(".lmfiles-local/journal-resume/results.jsonl")) { remove_file(".lmfiles-local/journal-resume/results.jsonl"); }
+let state = _lmcode_ cli="lmfiles";
+let db = registry.open(".lmfiles-local/journal-resume/state.mv", "journal", "{}");
+db.item_upsert("{\"id\":\"journal-1\"}", "{\"source\":\"synthetic\"}");
+db.item_upsert("{\"id\":\"journal-2\"}", "{\"source\":\"synthetic\"}");
+db.stage_record("1", "{\"stage\":\"published\",\"namespace\":\"fake-s3\",\"status\":\"ok\",\"source_revision\":\"1\"}");
+db.stage_record("2", "{\"stage\":\"published\",\"namespace\":\"fake-s3\",\"status\":\"ok\",\"source_revision\":\"1\"}");
+let plan_a = "{\"v\":1,\"kind\":\"instruction\",\"job\":\"journal\",\"op\":\"put-a\",\"payload\":{\"verb\":\"put\",\"item\":\"1\",\"stage\":\"published\",\"target\":\"fake-s3\",\"source_revision\":\"1\",\"record_projection\":\"record\"}}";
+let plan_b = "{\"v\":1,\"kind\":\"instruction\",\"job\":\"journal\",\"op\":\"put-b\",\"payload\":{\"verb\":\"put\",\"item\":\"2\",\"stage\":\"published\",\"target\":\"fake-s3\",\"source_revision\":\"1\",\"record_projection\":\"record\"}}";
+registry.log_append(".lmfiles-local/journal-resume/plan.jsonl", plan_a, "{}");
+registry.log_append(".lmfiles-local/journal-resume/plan.jsonl", plan_b, "{}");
+let digest = registry.instruction_digest(plan_a);
+let result_a = "{\"v\":1,\"kind\":\"result\",\"job\":\"journal\",\"op\":\"put-a\",\"result_id\":\"receipt-a\",\"completes_instruction\":true,\"payload\":{\"instruction_digest\":\"" + digest + "\",\"confirmed\":true,\"projection\":{\"kind\":\"record\",\"item\":\"1\",\"stage\":\"published\",\"target\":\"fake-s3\",\"status\":\"ok\",\"source_revision\":\"1\"}}}";
+registry.log_append(".lmfiles-local/journal-resume/results.jsonl", result_a, "{}");
+let remaining_path = ".lmfiles-local/journal-resume/unconfirmed.jsonl";
+registry.unconfirmed(".lmfiles-local/journal-resume/plan.jsonl", ".lmfiles-local/journal-resume/results.jsonl", remaining_path);
+let pending_count = 1;
+db.apply_records(".lmfiles-local/journal-resume/plan.jsonl", ".lmfiles-local/journal-resume/results.jsonl", "{}");
+db.apply_records(".lmfiles-local/journal-resume/plan.jsonl", ".lmfiles-local/journal-resume/results.jsonl", "{}");
+file_write(".lmfiles-local/journal-resume/data.dat", "planned 2\nconfirmed 1\nunconfirmed " + str(pending_count) + "\n");
+db.close();
+end _lmcode_
+savedsl(state, "build/journal-resume-state.dslb");
+let run = system ${dsl_cli(state)} --dsl build/journal-resume-state.dslb;
+assert(run.code == 0);
+
+let plot = _lmcode_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+plot.png("images/journal_resume.png", 820, 520);
+plot.cmd("set title 'Plan replay and confirmation gap'; set ylabel 'items'; set style data histograms; set style fill solid 0.8; set datafile separator ' '; set yrange [0:*]; plot '.lmfiles-local/journal-resume/data.dat' using 2:xtic(1) title 'journal state'");
+plot.close();
+end _lmcode_
+savedsl(plot, "build/journal-resume-plot.dslb");
+let plotted = system ${dsl_cli(plot)} --dsl build/journal-resume-plot.dslb;
+assert(plotted.code == 0);

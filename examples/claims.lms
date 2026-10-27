@@ -1,0 +1,29 @@
+# Synthetic worker claims: ten pending records divided 3 + 3 + 4.
+mkdir(".lmfiles-local"); mkdir(".lmfiles-local/claims"); mkdir("images"); mkdir("build");
+if (file_exists(".lmfiles-local/claims/state.mv")) { remove_file(".lmfiles-local/claims/state.mv"); }
+let state = _lmcode_ cli="lmfiles";
+let db = registry.open(".lmfiles-local/claims/state.mv", "claims", "{}");
+for (i in range(0, 10)) {
+  db.item_upsert("{\"id\":\"claim-" + str(i) + "\"}", "{\"source\":\"synthetic\"}");
+  db.stage_record(str(i + 1), "{\"stage\":\"fetched\",\"namespace\":\"source\",\"status\":\"ok\",\"source_revision\":\"1\"}");
+}
+db.difference_index("{\"stage\":\"fetched\",\"namespace\":\"source\",\"status\":\"ok\"}", "{\"stage\":\"cleaned\",\"namespace\":\"cleaner\",\"status\":\"ok\"}", "{\"id\":\"claims-frontier\"}");
+let a = db.claim("{\"difference\":\"claims-frontier\"}", "clean-workers", 3, 60000, "worker-a");
+let b = db.claim("{\"difference\":\"claims-frontier\"}", "clean-workers", 3, 60000, "worker-b");
+let c = db.claim("{\"difference\":\"claims-frontier\"}", "clean-workers", 100, 60000, "worker-c");
+let ac = a.rows(100, 1048576).len(); let bc = b.rows(100, 1048576).len(); let cc = c.rows(100, 1048576).len();
+file_write(".lmfiles-local/claims/data.dat", "worker-a " + str(ac) + "\nworker-b " + str(bc) + "\nremainder " + str(cc) + "\n");
+db.close();
+end _lmcode_
+savedsl(state, "build/claims-state.dslb");
+let run = system ${dsl_cli(state)} --dsl build/claims-state.dslb;
+assert(run.code == 0);
+
+let plot = _lmcode_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+plot.png("images/claims.png", 820, 520);
+plot.cmd("set title 'Claimed lifecycle work'; set ylabel 'items'; set style data histograms; set style fill solid 0.8; set datafile separator ' '; set yrange [0:*]; plot '.lmfiles-local/claims/data.dat' using 2:xtic(1) title 'claims'");
+plot.close();
+end _lmcode_
+savedsl(plot, "build/claims-plot.dslb");
+let plotted = system ${dsl_cli(plot)} --dsl build/claims-plot.dslb;
+assert(plotted.code == 0);

@@ -1,0 +1,30 @@
+# Synthetic frontier: 20 fetched records, 14 cleaned records, six pending.
+mkdir(".lmfiles-local"); mkdir(".lmfiles-local/frontier"); mkdir("images"); mkdir("build");
+if (file_exists(".lmfiles-local/frontier/state.mv")) { remove_file(".lmfiles-local/frontier/state.mv"); }
+let state = _lmcode_ cli="lmfiles";
+let db = registry.open(".lmfiles-local/frontier/state.mv", "frontier", "{}");
+for (i in range(0, 20)) {
+  db.item_upsert("{\"id\":\"law-" + str(i) + "\"}", "{\"source\":\"synthetic\"}");
+  db.stage_record(str(i + 1), "{\"stage\":\"fetched\",\"namespace\":\"source\",\"status\":\"ok\",\"source_revision\":\"1\"}");
+}
+for (i in range(0, 14)) {
+  db.stage_record(str(i + 1), "{\"stage\":\"published\",\"namespace\":\"site\",\"status\":\"ok\",\"source_revision\":\"1\"}");
+}
+db.difference_index("{\"stage\":\"fetched\",\"namespace\":\"source\",\"status\":\"ok\"}", "{\"stage\":\"published\",\"namespace\":\"site\",\"status\":\"ok\"}", "{\"id\":\"frontier\",\"require_matching_source_revision\":true}");
+let pending = db.stage_difference("{\"stage\":\"fetched\",\"namespace\":\"source\",\"status\":\"ok\"}", "{\"stage\":\"published\",\"namespace\":\"site\",\"status\":\"ok\"}", "{\"index\":\"frontier\",\"require_index\":true,\"require_matching_source_revision\":true}");
+let rows = pending.rows(100, 1048576);
+file_write(".lmfiles-local/frontier/data.dat", "fetched 20\npublished 14\npending " + str(rows.len()) + "\n");
+db.close();
+end _lmcode_
+savedsl(state, "build/frontier-state.dslb");
+let run = system ${dsl_cli(state)} --dsl build/frontier-state.dslb;
+assert(run.code == 0);
+
+let plot = _lmcode_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+plot.png("images/frontier.png", 820, 520);
+plot.cmd("set title 'Lifecycle frontier'; set ylabel 'items'; set style data histograms; set style fill solid 0.8; set datafile separator ' '; set yrange [0:*]; plot '.lmfiles-local/frontier/data.dat' using 2:xtic(1) title 'registry count'");
+plot.close();
+end _lmcode_
+savedsl(plot, "build/frontier-plot.dslb");
+let plotted = system ${dsl_cli(plot)} --dsl build/frontier-plot.dslb;
+assert(plotted.code == 0);
