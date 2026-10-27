@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>ai.lmctl</groupId>
+  <artifactId>lmfiles</artifactId>
+  <version>0.1.0</version>
+  <name>lmfiles</name>
+  <description>Local file lifecycle registry</description>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <maven.compiler.release>21</maven.compiler.release>
+    <main.class>ai.lmctl.lmfiles.Main</main.class>
+    <graalvm.native.maven.version>0.10.6</graalvm.native.maven.version>
+  </properties>
+
+  <dependencies>
+    <dependency><groupId>com.h2database</groupId><artifactId>h2</artifactId><version>2.3.232</version></dependency>
+  </dependencies>
+
+  <build>
+    <resources>
+      <resource><directory>src/main/resources</directory></resource>
+      <resource><directory>.</directory><includes><include>schema/lmfiles.dsl.json</include></includes></resource>
+      <resource><directory>.</directory><includes><include>THIRD_PARTY_NOTICES</include></includes></resource>
+      <resource><directory>third_party/lmcode-java</directory><includes><include>LICENSE</include></includes><targetPath>licenses/lmcode-java</targetPath></resource>
+    </resources>
+    <plugins>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId><artifactId>build-helper-maven-plugin</artifactId><version>3.6.0</version>
+        <executions><execution><id>released-sdk</id><phase>generate-sources</phase><goals><goal>add-source</goal></goals><configuration>
+          <sources><source>third_party/lmcode-java/src/main/java</source></sources>
+        </configuration></execution></executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId><version>3.13.0</version>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId><artifactId>maven-shade-plugin</artifactId><version>3.6.0</version>
+        <executions><execution><phase>package</phase><goals><goal>shade</goal></goals><configuration>
+          <createDependencyReducedPom>false</createDependencyReducedPom>
+          <shadedArtifactAttached>true</shadedArtifactAttached><shadedClassifierName>all</shadedClassifierName>
+          <filters><filter><artifact>*:*</artifact><excludes>
+            <exclude>META-INF/*.SF</exclude><exclude>META-INF/*.DSA</exclude><exclude>META-INF/*.RSA</exclude>
+          </excludes></filter></filters>
+          <transformers>
+            <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer"><mainClass>${main.class}</mainClass></transformer>
+            <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+          </transformers>
+        </configuration></execution></executions>
+      </plugin>
+      <plugin>
+        <groupId>org.graalvm.buildtools</groupId><artifactId>native-maven-plugin</artifactId><version>${graalvm.native.maven.version}</version>
+        <extensions>true</extensions>
+        <configuration>
+          <imageName>lmfiles</imageName><mainClass>${main.class}</mainClass>
+          <buildArgs>
+            <buildArg>--no-fallback</buildArg>
+            <buildArg>-H:+GenerateEmbeddedResourcesFile</buildArg>
+            <buildArg>--exclude-config</buildArg>
+            <buildArg>.*h2-2[.]3[.]232[.]jar</buildArg>
+            <buildArg>META-INF/native-image/reflect-config[.]json</buildArg>
+            <buildArg>--enable-native-access=ALL-UNNAMED</buildArg>
+            <buildArg>-march=compatibility</buildArg>
+            <buildArg>-R:MaxHeapSize=3072m</buildArg>
+            <buildArg>-R:ReservedAddressSpaceSize=4g</buildArg>
+            <buildArg>-J-Xmx4g</buildArg>
+            <buildArg>-H:AbortOnTypeReachable=java.awt.Toolkit</buildArg>
+            <buildArg>-H:NumberOfThreads=2</buildArg>
+            <buildArg>-H:+AddAllCharsets</buildArg>
+          </buildArgs>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId><artifactId>exec-maven-plugin</artifactId><version>3.5.0</version>
+        <executions>
+          <execution><id>verify-released-sdk</id><phase>validate</phase><goals><goal>exec</goal></goals><configuration>
+            <executable>python3</executable><arguments><argument>scripts/sync-sdk.py</argument><argument>--ensure</argument></arguments>
+          </configuration></execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+
+  <profiles><profile><id>native</id><build><plugins><plugin>
+    <groupId>org.graalvm.buildtools</groupId><artifactId>native-maven-plugin</artifactId>
+    <executions><execution><id>native-compile</id><phase>package</phase><goals><goal>compile-no-fork</goal></goals></execution></executions>
+  </plugin></plugins></build></profile>
+  <profile><id>linux-linkage</id><activation><os><name>Linux</name></os></activation><build><plugins><plugin>
+    <groupId>org.graalvm.buildtools</groupId><artifactId>native-maven-plugin</artifactId>
+    <configuration><buildArgs combine.children="append">
+      <buildArg>-H:+StaticExecutableWithDynamicLibC</buildArg>
+      <buildArg>-H:NativeLinkerOption=-static-libstdc++</buildArg>
+      <buildArg>-H:NativeLinkerOption=-static-libgcc</buildArg>
+      <buildArg>-H:NativeLinkerOption=-lm</buildArg>
+    </buildArgs></configuration>
+  </plugin></plugins></build></profile></profiles>
+</project>
