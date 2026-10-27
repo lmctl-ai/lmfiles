@@ -70,3 +70,12 @@ metadata-heavy profiles, compaction amplification and100M local items under fixe
 memory. Optional scans, general indexed predicates/change cursors/event archives
 and multi-process coordination also remain1C. Existing transport-host gaps remain
 separate; no real AWS/SFTP test is performed or authorized here.
+
+## Five-platform qualification
+
+[Manual CI](https://github.com/lmctl-ai/lmfiles/actions/runs/40526639317) passed managed and native gates on all five targets
+for code commit `a8ebebb7fa26f732ffc669e3191dc5b988257d2d`. Five tested artifacts
+were uploaded; no tag or release was created. Linux reports18 process checks;
+macOS/Windows report17 because the optional Linux strace check is unavailable.
+The55 semantic and13 journal assertions pass on every target. Gallery and public
+URL execution evidence is the separate local Linux campaign above.

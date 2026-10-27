@@ -30,5 +30,18 @@
   "publication_scenarios": 6,
   "public_readme_urls_verified": 6,
   "real_cloud_requests": 0,
-  "note": "Benchmark artifact/source is the recorded 45d4324 measurement; follow-up gate adds deterministic lock termination and cache accounting."
+  "note": "Benchmark artifact/source is the recorded 45d4324 measurement; follow-up gate adds deterministic lock termination and cache accounting.",
+  "ci": {
+    "run": "https://github.com/lmctl-ai/lmfiles/actions/runs/40526639317",
+    "code_commit": "a8ebebb7fa26f732ffc669e3191dc5b988257d2d",
+    "conclusion": "success",
+    "platforms": [
+      "linux-x64",
+      "linux-arm64",
+      "macos-x64",
+      "macos-arm64",
+      "windows-x64"
+    ],
+    "mode": "workflow_dispatch; managed and native, local fakes only"
+  }
 }

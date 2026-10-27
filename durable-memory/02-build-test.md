@@ -11,3 +11,8 @@ Run test.sh and test.sh --native. CI is workflow_dispatch only, five platforms,
 local/fake tests only. No tag/release was authorized; Lead owns release.
 SDK standards and host signatures must match compiler schema output. Notices
 embed MIT SDK license, H2 MPL2 text and runtime/platform attribution.
+
+All five managed/native jobs passed: https://github.com/lmctl-ai/lmfiles/actions/runs/40526639317
+Code:a8ebebb7fa26f732ffc669e3191dc5b988257d2d. No Windows stub is needed.
+No tags/releases exist; Lead releases. Local native final gate also ran all six
+gallery jobs and six publication scenarios with real cloud request count0.

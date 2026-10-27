@@ -35,8 +35,8 @@ lmctl examples/publish_ttl.lms changed  # one changed revision
 ```
 
 Linux binaries use dynamic glibc (CI baseline Ubuntu 22.04/glibc 2.35) with other
-native-image dependencies static. macOS/Windows are configured in the manual-only
-five-platform CI; local verification here is Linux x64. No application JNI,
+native-image dependencies static. macOS/Windows have passed the manual-only
+[five-platform managed/native CI](https://github.com/lmctl-ai/lmfiles/actions/runs/40526639317). Measurements here are Linux x64. No application JNI,
 C++ sidecar, cloud SDK or SSH library is linked into the registry. H2 MVStore uses
 positional file I/O, not mmap. Its upstream native metadata that pulls in AWT is
 excluded and a minimal explicit reflection configuration is supplied.
