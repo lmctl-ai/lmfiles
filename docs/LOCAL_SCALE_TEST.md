@@ -189,3 +189,53 @@ The historical20M Linux kill/recovery result remains valid; maintenance admissio
 was more restrictive. A separate guarded Linux follow-up attempts2M and8M sizes,
 with the same40GB/25GB hard limits. It may skip maintenance before allocating
 unsafe temporary copies. E: capacity never relaxes those Linux limits.
+
+
+## Completed two-volume follow-up
+
+All admitted steps passed; both ramps then returned `budget_stopped` before the
+next size, and all temporary directories were independently verified absent.
+No registry mismatch, hard-guard violation, cloud request, tag or release occurred.
+No on-disk format or registry API changed.
+
+| Run | Completed size | Exact aliases / events | Selected updates | Samples | Final pending frontier | Result |
+|---|---:|---|---:|---:|---:|---|
+| E:9p volume only |1,000,000 |2,000,000 /5,055,804 |10,000 |10,009 |4,186 |All5 phases passed |
+| Linux ext4 |2,000,000 |4,000,000 /10,111,475 |20,000 |10,009 |8,506 |All11 phases passed |
+
+Each completed128 claims with0 active claims afterward. Updates verified every
+selected new revision/attribute and failed-after-success projection. Sampled
+identity/alias/unknown lookups and the complete independently computed frontier
+matched exactly. Linux additionally retained acknowledged data after actual
+SIGKILL mid-batch, found0 phantoms, passed doctor, compacted and reverified,
+and upgraded2M items from format2 to3 while validating the retained format2 backup.
+The final upgrade repeated exact counts, samples and frontier membership.
+
+| Run | Min free observed | Peak directory | Completed step wall time | Next size / projected time |
+|---|---:|---:|---:|---|
+| E: |2,847.64GB |0.926GB |295.25s |10M /3,690.62s |
+| Linux |93.55GB |8.687GB |1,022.45s |8M /5,112.24s |
+
+Each run had a3,600s budget; next-step projections include25% margin. No10M/50M/
+100M E: step and no8M Linux step was started. This is a budget stop, not a complete
+ramp qualification. Timings/bytes per item are informational: E:925.66bytes/item
+at its final checkpoint; Linux1,118.65bytes/item after upgrade, including normal
+store layout/operation history. No throughput or capacity guarantee is inferred.
+
+Across the separate completed Linux campaigns, the largest proven core/SIGKILL
+size remains20M, largest compaction5M, and largest format2→3 upgrade is now2M.
+Lock/stale-lock, sync policy, torn-write, compaction fault and atomic-swap fault
+fixtures ran only on ext4 in both managed/native gates. Those fault fixtures are
+small; do not imply every fault injection was repeated on the largest dataset.
+Linux gates passed271 registry assertions and21 subprocess checks; current guard
+unit suite25 tests. Native also passed its reserved-address-space check and an
+E:1,000-item functional smoke. Six native E: durability-phase requests were rejected
+before any DB was created. Gallery execution was skipped by the normal default;
+its existing captions/PNG checks passed. No gallery content changed.
+
+[EXT4_FOLLOWUP_RESULTS.json](EXT4_FOLLOWUP_RESULTS.json) and
+[DRVFS_VOLUME_RESULTS.json](DRVFS_VOLUME_RESULTS.json) contain sanitized per-phase
+counts, timings, guard observations, cleanup and worker provenance. The
+[small mount probe](DRVFS_LIMITATIONS.md) observed a missing destination during
+concurrent rename on9p: **E: is not a supported durability target**. This mount
+limitation is not a registry correctness defect or a reason to weaken guarantees.

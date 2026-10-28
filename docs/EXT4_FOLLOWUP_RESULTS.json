@@ -1,0 +1,311 @@
+{
+  "state": "budget_stopped",
+  "scope": "Local synthetic correctness; timings and sizes informational only",
+  "volume": "linux",
+  "budget_seconds": 3600.0,
+  "next_count": 8000000,
+  "projected_next_seconds": 5112.244600115082,
+  "guards": {
+    "minimum_volume_free_bytes": 40000000000,
+    "minimum_root_free_bytes": 40000000000,
+    "maximum_registry_bytes": 25000000000,
+    "readings": 3027,
+    "minimum_volume_free_observed": 93554937856,
+    "minimum_root_free_observed": 93554937856,
+    "maximum_registry_observed": 8687128576
+  },
+  "cleanup_verified": true,
+  "directory_independently_absent": true,
+  "largest_indexed": 2000000,
+  "largest_compacted": 2000000,
+  "largest_upgraded": 2000000,
+  "steps": [
+    {
+      "items_requested": 2000000,
+      "operations": [
+        {
+          "operation": "build",
+          "status": "ok",
+          "seconds_informational": 439.704769475,
+          "exact_counts": {
+            "aliases": "4000000",
+            "claims": "0",
+            "events": "9998000",
+            "examined": "0",
+            "items": "2000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "db_bytes": 1619959808,
+          "bytes_per_item_informational": 809.979904,
+          "guard": {
+            "samples": 880,
+            "free_before": 102911979520,
+            "free_after": 100736663552,
+            "minimum_free": 100736663552,
+            "maximum_directory": 1620004864
+          },
+          "items_added": 2000000,
+          "items_per_second_informational": 4548.5064953649835
+        },
+        {
+          "operation": "verify",
+          "status": "ok",
+          "seconds_informational": 2.978460355,
+          "exact_counts": {
+            "aliases": "4000000",
+            "claims": "0",
+            "events": "9998000",
+            "examined": "0",
+            "items": "2000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "samples": 10009,
+          "subset_rows": 10009,
+          "frontier_rows": 2000,
+          "db_bytes": 1619959808,
+          "bytes_per_item_informational": 809.979904,
+          "guard": {
+            "samples": 8,
+            "free_before": 100736290816,
+            "free_after": 100736274432,
+            "minimum_free": 100736233472,
+            "maximum_directory": 1620004864
+          }
+        },
+        {
+          "operation": "update",
+          "status": "ok",
+          "seconds_informational": 29.595348034,
+          "exact_counts": {
+            "aliases": "4000000",
+            "claims": "0",
+            "events": "10111346",
+            "examined": "0",
+            "items": "2000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "updated": 20000,
+          "failed_after_success_verified": 20000,
+          "db_bytes": 1811447808,
+          "bytes_per_item_informational": 905.723904,
+          "guard": {
+            "samples": 61,
+            "free_before": 100736270336,
+            "free_after": 100544131072,
+            "minimum_free": 100544131072,
+            "maximum_directory": 1811496960
+          },
+          "updates_per_second_informational": 675.7818822412028
+        },
+        {
+          "operation": "claim",
+          "status": "ok",
+          "seconds_informational": 0.875027853,
+          "exact_counts": {
+            "aliases": "4000000",
+            "claims": "0",
+            "events": "10111474",
+            "examined": "0",
+            "items": "2000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "claimed_and_completed": 128,
+          "db_bytes": 1814450176,
+          "bytes_per_item_informational": 907.225088,
+          "guard": {
+            "samples": 3,
+            "free_before": 100544102400,
+            "free_after": 100541100032,
+            "minimum_free": 100541100032,
+            "maximum_directory": 1814499328
+          }
+        },
+        {
+          "operation": "reopen",
+          "status": "ok",
+          "seconds_informational": 2.866196917,
+          "exact_counts": {
+            "aliases": "4000000",
+            "claims": "0",
+            "events": "10111474",
+            "examined": "0",
+            "items": "2000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "samples": 10009,
+          "subset_rows": 10009,
+          "frontier_rows": 8506,
+          "db_bytes": 1814450176,
+          "bytes_per_item_informational": 907.225088,
+          "guard": {
+            "samples": 7,
+            "free_before": 100541095936,
+            "free_after": 100541095936,
+            "minimum_free": 100541063168,
+            "maximum_directory": 1814499328
+          }
+        },
+        {
+          "operation": "crash_prepare",
+          "status": "ok",
+          "seconds_informational": 0.280408154,
+          "exact_counts": {
+            "aliases": "4000000",
+            "claims": "0",
+            "events": "10111475",
+            "examined": "0",
+            "items": "2000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "db_bytes": 1814470656,
+          "bytes_per_item_informational": 907.235328,
+          "guard": {
+            "samples": 2,
+            "free_before": 100541091840,
+            "free_after": 100541063168,
+            "minimum_free": 100541063168,
+            "maximum_directory": 1814519808
+          }
+        },
+        {
+          "operation": "crash",
+          "status": "ok",
+          "seconds_informational": 0.3920156955718994,
+          "guard": {
+            "samples": 1,
+            "free_before": 100541063168,
+            "free_after": 100541063168,
+            "minimum_free": 100541063168,
+            "maximum_directory": 1814519808
+          },
+          "signal": "SIGKILL",
+          "half_written_commit_observed": true
+        },
+        {
+          "operation": "recover",
+          "status": "ok",
+          "seconds_informational": 0.261848356,
+          "exact_counts": {
+            "aliases": "4000000",
+            "claims": "0",
+            "events": "10111475",
+            "examined": "0",
+            "items": "2000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "confirmed_records_retained": true,
+          "phantoms": 0,
+          "db_bytes": 1814470656,
+          "bytes_per_item_informational": 907.235328,
+          "guard": {
+            "samples": 2,
+            "free_before": 100540964864,
+            "free_after": 100541042688,
+            "minimum_free": 100540964864,
+            "maximum_directory": 1814573056
+          }
+        },
+        {
+          "operation": "doctor",
+          "status": "ok",
+          "seconds_informational": 55.41322452,
+          "exact_counts": {
+            "aliases": "4000000",
+            "claims": "0",
+            "events": "10111475",
+            "examined": "0",
+            "items": "2000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "db_bytes": 1814470656,
+          "bytes_per_item_informational": 907.235328,
+          "guard": {
+            "samples": 112,
+            "free_before": 100541038592,
+            "free_after": 100540809216,
+            "minimum_free": 100537139200,
+            "maximum_directory": 1814519808
+          }
+        },
+        {
+          "operation": "compact",
+          "status": "ok",
+          "seconds_informational": 3.837932223,
+          "exact_counts": {
+            "aliases": "4000000",
+            "claims": "0",
+            "events": "10111475",
+            "examined": "0",
+            "items": "2000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "samples": 10009,
+          "subset_rows": 10009,
+          "frontier_rows": 8506,
+          "db_bytes": 1849417728,
+          "bytes_per_item_informational": 924.708864,
+          "guard": {
+            "samples": 9,
+            "free_before": 100540764160,
+            "free_after": 100505800704,
+            "minimum_free": 100505767936,
+            "maximum_directory": 1849466880
+          }
+        },
+        {
+          "operation": "upgrade",
+          "status": "ok",
+          "seconds_informational": 485.162569028,
+          "exact_counts": {
+            "aliases": "4000000",
+            "claims": "0",
+            "events": "10111475",
+            "examined": "0",
+            "items": "2000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "backup_verified": true,
+          "upgraded_items": 2000000,
+          "format2_bytes": 3224834048,
+          "post_upgrade": {
+            "frontier_rows": 8506,
+            "samples": 10009,
+            "subset_rows": 10009
+          },
+          "db_bytes": 2237308928,
+          "bytes_per_item_informational": 1118.654464,
+          "guard": {
+            "samples": 971,
+            "free_before": 100505796608,
+            "free_after": 100004184064,
+            "minimum_free": 93554937856,
+            "maximum_directory": 8687128576
+          }
+        }
+      ]
+    }
+  ],
+  "aws_requests": 0,
+  "admin_commands": 0,
+  "tag_or_release_created": false,
+  "provenance": {
+    "implementation_commit": "c2e25a5",
+    "worker_sha256": "35e87706d4d482db763b23dd5d9f8fc22b5a4e1279cdf1d3d4311fcdc4d6375b",
+    "worker_runtime": "managed OpenJDK21"
+  },
+  "historical_maxima": {
+    "core_sigkill_items": 20000000,
+    "compaction_items": 5000000,
+    "format2_upgrade_items": 2000000
+  }
+}

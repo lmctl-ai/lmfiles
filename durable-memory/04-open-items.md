@@ -35,7 +35,8 @@ temporary DB cleanup. Informational numbers only. See docs/LOCAL_SCALE_TEST.md;
 do not confuse this specific campaign with an open-ended performance roadmap.
 
 The authorized local ramp completed through20M items and removed its DB. All core
-operations/doctor passed; compaction qualified through5M and format2→3 through1M.
+operations/doctor passed; compaction through5M. The ext4 follow-up upgraded2M
+items from format2→3 with backup/data/count/frontier verification.
 Larger maintenance was skipped by conservative transient-space admission, not
 claimed as tested. Minrootfree82.33GB/maxfixture17.70GB; no hard guard violation.
 See docs/LOCAL_SCALE_RESULTS.json for exact counts and code/archive provenance.
@@ -47,3 +48,7 @@ stay on Linux ext4. No additional live/cloud run is authorized.
 E: follow-up completed1M core volume checks, then stopped before10M on projected
 one-hour budget; temporary directory removed.9p rename probe observed a missing
 destination, so durability remains unsupported. See docs/DRVFS_LIMITATIONS.md.
+
+The ext4 follow-up completed2M core/recovery/doctor/compaction/upgrade, then
+stopped before8M on the one-hour budget and removed its fixture. Peak8.687GB,
+minrootfree93.55GB; no guard violation. See docs/EXT4_FOLLOWUP_RESULTS.json.

@@ -34,7 +34,7 @@ batch guards. All data is synthetic; cleanup is mandatory. Default steps1M/5M/20
 are opt-in, not a default gate. See docs/LOCAL_SCALE_TEST.md.
 
 Completed local campaign:1M/5M/20M core correctness passed; all DB files removed.
-Maintenance safely admitted compaction through5M and format upgrade through1M.
+Across the completed Linux runs: compaction through5M, format2→3 upgrade through2M.
 Scale harness captured archive9a3fba0; test-only atomic fixture fixfd45ed5 has
 114 storage assertions and native/managed gates. No on-disk format change.
 
@@ -49,3 +49,8 @@ free/150GB fixture plus40GB root free; default wall budget1h, maximum6h. Next-st
 admission uses prior elapsed time with25% margin. All fixtures removed. 9p/DrvFS
 is unsupported for durability; crash/lock/fsync/compaction/upgrade tests stay on
 Linux ext4. See docs/DRVFS_LIMITATIONS.md.25 safety unit tests in each gate.
+
+E:1M volume checks passed; budget stopped before10M and removed the fixture.
+Linux follow-up2M passed all phases, budget stopped before8M, fixture removed.
+Exact evidence: docs/DRVFS_VOLUME_RESULTS.json and docs/EXT4_FOLLOWUP_RESULTS.json.
+The mount probe observed a missing rename destination; keep durability on ext4.

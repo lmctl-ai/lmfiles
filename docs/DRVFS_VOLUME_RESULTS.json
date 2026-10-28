@@ -169,5 +169,7 @@
     50000000,
     100000000
   ],
-  "mount_probe": "DRVFS_PROBE_RESULTS.json"
+  "mount_probe": "DRVFS_PROBE_RESULTS.json",
+  "native_durability_phase_refusals": 6,
+  "policy_refusal_fixture_cleanup_verified": true
 }

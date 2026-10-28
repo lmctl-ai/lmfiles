@@ -27,3 +27,5 @@
 - [../docs/DRVFS_PROBE_RESULTS.json](../docs/DRVFS_PROBE_RESULTS.json): sampled mount behavior; a concurrent rename reader observed a missing destination.
 
 - [../docs/DRVFS_VOLUME_RESULTS.json](../docs/DRVFS_VOLUME_RESULTS.json): E:1M volume correctness passed; budget stopped before10M; cleanup verified.
+
+- [../docs/EXT4_FOLLOWUP_RESULTS.json](../docs/EXT4_FOLLOWUP_RESULTS.json):2M Linux correctness/durability/upgrade passed; budget stop before8M; cleanup verified.
