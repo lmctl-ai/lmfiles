@@ -1,5 +1,5 @@
 # Capability preflight ONLY. No AWS session is opened and no bucket is created.
-# The requested live phases and seeded soak is blocked by the pinned release API.
+# The live driver is separate; this preflight never executes AWS bytecode.
 # Run: AWS_PROFILE=lmaws lmctl <raw URL>.lms <synthetic-run-id>
 assert(env("AWS_PROFILE","")=="lmaws","AWS_PROFILE must be exactly lmaws; admin/default are refused");
 let RUN=ARGV.get(0,"");
@@ -8,32 +8,32 @@ let cap=env("LMAWS_MAX_COST_USD","0.05");
 assert(cap=="0.05","this bounded test uses exactly the default $0.05 cap");
 mkdir(".lmfiles-local/s3-100");
 # Declaring a block obtains the installed schema; this block is NEVER executed.
-let host=_lmcode_ cli="lmaws" install="github:lmctl-ai/lmaws@v0.1.22";
+let host=_lmcode_ cli="lmaws" install="github:lmctl-ai/lmaws@v0.1.23";
 check(true);
 end _lmcode_
 let cli=dsl_cli(host);
 let version=system(concat(cli,["--version"]),30000);
-assert(version.code==0 && trim(version.stdout)=="lmaws 0.1.22","the pinned lmaws v0.1.22 executable is required on PATH");
+assert(version.code==0 && trim(version.stdout)=="lmaws 0.1.23","the pinned lmaws v0.1.23 executable is required on PATH");
 let result=system(concat(cli,["--dsl-schema","--json"]),30000);assert(result.code==0);
 let schema=json_parse(result.stdout);let methods=schema.types.Cloud.methods;
 let missing=[];
 # These exact gaps are also documented in lmaws/docs/LMSYNC_DESIGN.md.
-for(name in ["s3_put_file","s3_head_object","s3_list_objects","s3_delete_objects","s3_bucket_create","s3_bucket_delete"]){
+for(name in ["s3_bucket_create_exact","s3_bucket_attach","s3_bucket_delete","s3_put_file","s3_head_object","s3_list_objects","s3_delete_objects","s3_ledger_summary"]){
  if(!methods.has(name)){missing=concat(missing,[name]);}
 }
 let phases=[];
 for(name in ["first_publish","no_change_zero_requests","change_add_delete","crash_resume","uncertain_and_412","seeded_soak","three_way_reconciliation","listing_import_rebuild","independent_verification","teardown"]){
- phases=concat(phases,[{phase:name,status:"not_run_release_api_gap"}]);
+ phases=concat(phases,[{phase:name,status:"not_run_preflight"}]);
 }
 let rounds=[];
-for(i in range(1,31)){rounds=concat(rounds,[{round:i,status:"not_run_release_api_gap",operations:null,faults_injected:0,converged:null}]);}
+for(i in range(1,31)){rounds=concat(rounds,[{round:i,status:"not_run_preflight",operations:null,faults_injected:0,converged:null}]);}
 let reconciliation=[];
-for(name in ["key_sets","sizes","sha256","etag_md5","version_and_headers","timestamp_interval","round_revision_order","model_vs_local"]){reconciliation=concat(reconciliation,[{check:name,status:"not_run_release_api_gap"}]);}
+for(name in ["key_sets","sizes","sha256","etag_md5","version_and_headers","timestamp_interval","round_revision_order","model_vs_local"]){reconciliation=concat(reconciliation,[{check:name,status:"not_run_preflight"}]);}
 # Public-safe output: counts/status only; no run id, bucket, keys, ARNs or account identity.
-write_json(".lmfiles-local/s3-100/preflight.json",{status:"blocked_release_api",host_version:"0.1.22",missing_api:missing,objects_requested:100,buckets_created:0,objects_created:0,aws_requests:0,ledger_opened:false,request_count_basis:"version_and_schema_only_no_aws_execution",estimated_cost_usd:0,remote_absence_verified:false,phases:phases,soak:{seed:20261027,rounds_planned:30,rounds_executed:0,object_put_cap:400,operations_executed:0,faults_planned:["kill","lost_response","failed_upload"],faults_injected:0,converged:null,rounds:rounds},reconciliation:reconciliation,observed_max_skew_seconds:null,listing_rebuild_verified:false});
+write_json(".lmfiles-local/s3-100/preflight.json",{status:missing.len()==0?"ready":"blocked_release_api",host_version:"0.1.23",missing_api:missing,objects_requested:100,buckets_created:0,objects_created:0,aws_requests:0,ledger_opened:false,request_count_basis:"version_and_schema_only_no_aws_execution",estimated_cost_usd:0,remote_absence_verified:false,phases:phases,soak:{seed:20261027,rounds_planned:30,rounds_executed:0,object_put_cap:400,operations_executed:0,faults_planned:["kill","lost_response","failed_upload"],faults_injected:0,converged:null,rounds:rounds},reconciliation:reconciliation,observed_max_skew_seconds:null,listing_rebuild_verified:false});
 println("Planned correctness soak seed=20261027; rounds=30; executed=0.");
-println("BLOCKED: released lmaws v0.1.22 lacks the required S3 lifecycle API.");
+println(missing.len()==0?"READY: released lmaws v0.1.23 S3 lifecycle signatures present.":"BLOCKED: required S3 lifecycle signatures missing.");
 println("No AWS session opened; created buckets=0; created objects=0; AWS requests=0.");
 println("No independent remote absence check was performed.");
 println("estimated cost: $0.00");
-exit(2);
+exit(missing.len()==0?0:2);

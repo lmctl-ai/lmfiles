@@ -1,0 +1,252 @@
+# Public autorun bootstraps only this repository's job and local safety supervisor.
+if(env("LMFILES_S3_SUPERVISED","")!="1"){
+ assert(ARGV.len()==2&&ARGV[0]=="--live","Usage: AWS_PROFILE=lmaws lmctl <this URL>.lms --live <unique synthetic run id>");
+ assert(env("AWS_PROFILE","")=="lmaws","AWS_PROFILE must be lmaws");
+ let BOOT=abs_path(".lmfiles-local/s3-live-bootstrap");mkdir(BOOT+"/scripts");mkdir(BOOT+"/examples");
+ for(name in ["test-s3-live.py","s3-live-oracle.py","s3_correctness_oracle.py"]){assert(write_file(BOOT+"/scripts/"+name,http_get("https://raw.githubusercontent.com/lmctl-ai/lmfiles/main/scripts/"+name)));}
+ assert(write_file(BOOT+"/examples/upload_s3_live.lms",http_get("https://raw.githubusercontent.com/lmctl-ai/lmfiles/main/examples/upload_s3_live.lms")));
+ let launched=system(["python3",BOOT+"/scripts/test-s3-live.py","--live","--run-id",ARGV[1]],4200000);
+ assert(launched.code==0,"S3 job failed; supervisor retained private evidence and attempted cleanup");exit(0);
+}
+# One job owns all registry policy, real S3 actions, recovery and independent checks.
+# Invoke through scripts/test-s3-live.py --live --run-id <unique synthetic id>.
+assert(env("LMFILES_S3_SUPERVISED","")=="1","run scripts/test-s3-live.py so cleanup executes on every failure");
+assert(env("AWS_PROFILE","")=="lmaws" && env("AWS_DEFAULT_PROFILE","")=="lmaws","lmaws profile only");
+assert(env("LMAWS_MAX_COST_USD","")=="0.05","default $0.05 cap required");
+let MODE=ARGV.get(0,"");let RUN=ARGV.get(1,"");assert(regex_test(RUN,"^[a-z0-9]{1,32}$"));
+let BUCKET="lmaws-lmfiles-"+RUN;let ROOT=".lmfiles-local/s3-live";let DB=ROOT+"/state.mv";
+let PLAN=ROOT+"/plan.jsonl";let RESULTS=ROOT+"/results.jsonl";let HELPER=env("LMFILES_S3_HELPER");let SUPERVISOR=env("LMFILES_S3_SUPERVISOR");
+mkdir(ROOT);mkdir(ROOT+"/ledger");mkdir(ROOT+"/build");
+let STATE={catalog:{},history:[],max_skew:0,nonce:0};let phase_rows=[];let soak_rows=[];
+fn native(p,name){
+ let path=ROOT+"/build/"+name+".dslb";savedsl(p,path);
+ let r=system(concat(dsl_cli(p),["--dsl",path]),600000);
+ if(r.code!=0){write_file(ROOT+"/error-"+name+".txt",r.stdout+"\n"+r.stderr);}
+ return r;
+}
+fn ensure(r){assert(r.code==0,"host failed; private diagnostic retained; supervisor will clean exact bucket");}
+fn helper(action){let r=system(concat(["python3",HELPER],action),30000);assert(r.code==0,r.stderr);}
+fn ledger(){
+ let p=_lmcode_ cli="lmaws" install="github:lmctl-ai/lmaws@v0.1.23";
+file_write(${ROOT+"/ledger-summary.json"},aws.s3_ledger_summary(${RUN}));
+end _lmcode_
+ ensure(native(p,"ledger"));return read_json(ROOT+"/ledger-summary.json");
+}
+fn checkpoint(phases,rounds){write_json(ROOT+"/progress.json",{phases:phases,soak_rounds:rounds,observed_max_skew_seconds:STATE.max_skew});}
+fn puts(summary){return summary.get("by_operation",{}).get("PutObject",{}).get("requests",0);}
+fn flush_registry(){
+ if(file_exists(PLAN)&&file_exists(RESULTS)){
+ let p=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
+let db=registry.open(${DB},"s3-live","{}");db.apply_records(${PLAN},${RESULTS},"{}");db.close();
+end _lmcode_
+ ensure(native(p,"replay"));}
+}
+fn query_rows(){
+ let ids=[];for(key in keys(STATE.catalog)){ids=concat(ids,[STATE.catalog[key]]);}
+ let p=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
+let db=registry.open(${DB},"s3-live","{}");let c=db.query_subset(${BUCKET},${json_stringify(ids)},${json_stringify({stage:"published",namespace:BUCKET,projection:"last_success"})});
+file_write(${ROOT+"/rows.json"},c.next_json(256,4194304));c.close();db.close();
+end _lmcode_
+ ensure(native(p,"query"));return read_json(ROOT+"/rows.json");
+}
+fn plan_job(round){
+ flush_registry();let entries=read_json(ROOT+"/manifest.json").entries;
+ let identities=[];let fields=[];let observations=[];
+ for(entry in entries){identities=concat(identities,[json_stringify({id:entry.key})]);fields=concat(fields,[json_stringify({content_hash:entry.sha256,size:str(entry.size),local_path:entry.path})]);observations=concat(observations,[json_stringify({hash:entry.sha256,size:str(entry.size),present:true,mtime_ns:str(entry.mtime_ns),algorithm:"SHA-256"})]);}
+ write_file(ROOT+"/identities.txt",join(identities,"\n"));write_file(ROOT+"/fields.txt",join(fields,"\n"));
+ let p=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
+let db=registry.open(${DB},"s3-live","{}");let identities=file_lines(${ROOT+"/identities.txt"});let fields=file_lines(${ROOT+"/fields.txt"});file_write(${ROOT+"/items.jsonl"},"");
+for(i in range(0,identities.len())){file_append(${ROOT+"/items.jsonl"},db.item_upsert(identities.at(i),fields.at(i))+"\n");}db.close();
+end _lmcode_
+ ensure(native(p,"upsert"));let items=read_lines(ROOT+"/items.jsonl");let ids=[];
+ for(i in range(0,entries.len())){let item=json_parse(items[i]);STATE.catalog[entries[i].key]=item.item;ids=concat(ids,[item.item]);}
+ write_json(ROOT+"/catalog.json",STATE.catalog);write_file(ROOT+"/ids.txt",join(ids,"\n"));write_file(ROOT+"/observations.txt",join(observations,"\n"));
+ let observe=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
+let db=registry.open(${DB},"s3-live","{}");let ids=file_lines(${ROOT+"/ids.txt"});let observations=file_lines(${ROOT+"/observations.txt"});for(i in range(0,ids.len())){db.observe(ids.at(i),observations.at(i));}db.close();
+end _lmcode_
+ ensure(native(observe,"observe"));let rows=query_rows();let local={};for(entry in entries){local[entry.key]=entry;}
+ let planned=[];let adds=0;let changes=0;let deletes=0;
+ for(row in rows){let key=row.identity;let recorded=row.get("recorded",{});
+  if(local.has(key)&&row.state!="same-as-recorded"){
+   let entry=local[key];let kind=recorded.get("status","")=="ok"?"changed":"add";if(kind=="add"){adds=adds+1;}else{changes=changes+1;}
+   planned=concat(planned,[{verb:"put",kind:kind,key:key,item:row.item,revision:row.revision,entry:entry,round:round}]);
+  } else if(!local.has(key)&&recorded.get("status","")=="ok"){
+   planned=concat(planned,[{verb:"delete",kind:"delete",key:key,item:row.item,revision:row.revision,round:round}]);deletes=deletes+1;
+  }
+ }
+ let instructions=[];
+ for(op in planned){let fingerprint=op.verb=="put"?{hash:op.entry.sha256,size:str(op.entry.size)}:{};let payload={verb:op.verb,item:op.item,stage:"published",target:BUCKET,source_revision:op.revision,source_fingerprint:fingerprint,record_projection:op.verb=="put"?"record":"forget",args:{key:op.key,round:round}};
+  if(op.verb=="put"){payload.args.sha256=op.entry.sha256;}
+  op.op=sha256(json_stringify(payload));op.fingerprint=fingerprint;
+  instructions=concat(instructions,[json_stringify({v:1,kind:"instruction",job:RUN,op:op.op,payload:payload})]);
+ }
+ if(instructions.len()>0){write_file(ROOT+"/instructions.txt",join(instructions,"\n"));
+ let prepare=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
+let lines=file_lines(${ROOT+"/instructions.txt"});file_write(${ROOT+"/digests.txt"},"");for(i in range(0,lines.len())){registry.log_append(${PLAN},lines.at(i),"{}");file_append(${ROOT+"/digests.txt"},registry.instruction_digest(lines.at(i))+"\n");}
+end _lmcode_
+ ensure(native(prepare,"plan"));let digests=read_lines(ROOT+"/digests.txt");for(i in range(0,planned.len())){planned[i].digest=digests[i];}}
+ write_json(ROOT+"/current-plan.json",planned);return {operations:planned,adds:adds,changed:changes,deletes:deletes};
+}
+fn record_receipts(operations,receipts,lose){
+ let lines=[];let confirmed=0;
+ for(i in range(0,receipts.len())){
+  let receipt=receipts[i];let op=operations[i];let accepted=receipt.get("ok",false)==true || receipt.get("ok","")=="true";
+  assert(num(receipt.get("http_status",0))!=403 && !contains(str(receipt.get("error_code","")),"AccessDenied"),"AWS denial; private receipt retained; stopping");
+  let known=accepted && !(lose&&i==0);let projection={kind:op.verb=="put"?"record":"forget",item:op.item,stage:"published",target:BUCKET,source_revision:op.revision,source_fingerprint:op.fingerprint};
+  if(op.verb=="put"){
+   projection.status="ok";projection.metadata={present:true,key:op.key,size:op.entry.size,sha256:op.entry.sha256,etag:receipt.get("etag",""),version:receipt.get("version_id","")==""?null:receipt.version_id,request_started:receipt.get("started",""),confirmed_at:receipt.get("finished",""),round:op.round,content_type:op.entry.content_type,cache_control:op.entry.cache_control};
+  }
+  let result={v:1,kind:"result",job:RUN,op:op.op,result_id:op.op+(known?"-confirmed":"-unconfirmed-"+str(STATE.nonce)),completes_instruction:known,payload:{instruction_digest:op.digest,confirmed:known,projection:projection}};
+  lines=concat(lines,[json_stringify(result)]);if(known){confirmed=confirmed+1;}
+ }
+ if(lines.len()>0){write_file(ROOT+"/receipt-lines.txt",join(lines,"\n"));
+ let p=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
+let lines=file_lines(${ROOT+"/receipt-lines.txt"});for(i in range(0,lines.len())){registry.log_append(${RESULTS},lines.at(i),"{}");}
+let db=registry.open(${DB},"s3-live","{}");db.apply_records(${PLAN},${RESULTS},"{}");db.close();
+end _lmcode_
+ ensure(native(p,"record"));}
+ return confirmed;
+}
+fn execute(plan,fault,kill_after){
+ let deletes=[];let uploads=[];for(op in plan.operations){if(op.verb=="delete"){deletes=concat(deletes,[op]);}else{uploads=concat(uploads,[op]);}}
+ STATE.nonce=STATE.nonce+1;let confirmations=0;
+ if(deletes.len()>0){let names=[];for(op in deletes){names=concat(names,[op.key]);}
+ let p=_lmcode_ cli="lmaws" install="github:lmctl-ai/lmaws@v0.1.23";
+let c=aws.region("us-east-1");file_write(${ROOT+"/attach.json"},c.s3_bucket_attach(${BUCKET},${RUN}));file_write(${ROOT+"/delete-receipts.json"},c.s3_delete_objects(${BUCKET},${json_stringify(names)}).json());
+end _lmcode_
+ ensure(native(p,"delete"));let deleted=record_receipts(deletes,read_json(ROOT+"/delete-receipts.json"),false);assert(deleted==deletes.len(),"unconfirmed delete; stop before uploads");confirmations=confirmations+deleted;}
+ if(uploads.len()>0){let before=ledger();assert(puts(before)+uploads.len()<=400,"400 object PUT admission cap");
+ let paths=[];let names=[];let opts=[];
+ for(i in range(0,uploads.len())){let op=uploads[i];names=concat(names,[op.key]);paths=concat(paths,[op.entry.path]);let options={expected_sha256:(fault=="failed"&&i==0)?"0000000000000000000000000000000000000000000000000000000000000000":op.entry.sha256,content_type:op.entry.content_type,cache_control:op.entry.cache_control,metadata:{sha256:op.entry.sha256},operation_id:op.op};opts=concat(opts,[json_stringify(options)]);}
+ write_file(ROOT+"/put-keys.txt",join(names,"\n"));write_file(ROOT+"/put-paths.txt",join(paths,"\n"));write_file(ROOT+"/put-options.txt",join(opts,"\n"));write_file(ROOT+"/put-receipts.jsonl","");
+ if(file_exists(ROOT+"/kill-ready")){remove_file(ROOT+"/kill-ready");}
+ let program=_lmcode_ cli="lmaws" install="github:lmctl-ai/lmaws@v0.1.23";
+let c=aws.region("us-east-1");file_write(${ROOT+"/attach.json"},c.s3_bucket_attach(${BUCKET},${RUN}));
+let keys=file_lines(${ROOT+"/put-keys.txt"});let paths=file_lines(${ROOT+"/put-paths.txt"});let options=file_lines(${ROOT+"/put-options.txt"});
+for(i in range(0,keys.len())){
+ let receipt=c.s3_put_file(${BUCKET},keys.at(i),paths.at(i),options.at(i));
+ if(i+1==${kill_after}&&${fault}=="kill"){file_write(${ROOT+"/kill-ready"},"ready");for(j in range(0,1000000)){if(file_exists(${ROOT+"/never-ack"})){break;}}check(false);}
+ file_append(${ROOT+"/put-receipts.jsonl"},receipt+"\n");
+ if(i+1==${kill_after}&&${fault}!="kill"){file_write(${ROOT+"/kill-ready"},"ready");for(j in range(0,1000000)){if(file_exists(${ROOT+"/never-ack"})){break;}}check(false);}
+ if(${fault}=="lost"&&i==0){check(false);}
+ check(!str_contains(receipt,"\"ok\":false"));
+}
+end _lmcode_
+ let bytecode=ROOT+"/build/executor.dslb";savedsl(program,bytecode);
+ let launcher=system(["python3",SUPERVISOR,"executor","--command",json_stringify(concat(dsl_cli(program),["--dsl",bytecode])),"--ready",ROOT+"/kill-ready","--receipts",ROOT+"/put-receipts.jsonl","--output",ROOT+"/executor-exit.json"],330000);assert(launcher.code==0,"executor supervisor failed");
+ let exit=read_json(ROOT+"/executor-exit.json");if(kill_after>0){assert(exit.killed&&exit.code==-9,"executor was not SIGKILLed at checkpoint");}
+ let receipts=[];for(line in read_lines(ROOT+"/put-receipts.jsonl")){if(trim(line)!=""){receipts=concat(receipts,[json_parse(line)]);}}
+ confirmations=confirmations+record_receipts(uploads,receipts,fault=="lost");
+ if(fault=="none"&&kill_after==0){assert(exit.code==0 && receipts.len()==uploads.len(),"unexpected SDK failure; stopping");}
+ if(fault=="failed"){assert(receipts.len()==1 && receipts[0].error_code=="LocalChecksumMismatch" && !receipts[0].ambiguous,"expected failed upload refusal");}
+ }
+ return confirmations;
+}
+fn registry_view(){let rows=query_rows();let view={};for(row in rows){let p=row.get("recorded",{});if(p.get("status","")=="ok"){let m=p.metadata;view[row.identity]={present:true,status:"ok",confirmed:true,size:m.size,sha256:m.sha256,etag:m.etag,version:m.version,request_started:m.get("request_started",""),confirmed_at:m.get("confirmed_at",""),round:m.round,revision:num(p.source_revision)};}}return view;}
+fn verify(round,full){
+ let p=_lmcode_ cli="lmaws" install="github:lmctl-ai/lmaws@v0.1.23";
+let c=aws.region("us-east-1");file_write(${ROOT+"/attach.json"},c.s3_bucket_attach(${BUCKET},${RUN}));file_write(${ROOT+"/listing.json"},c.s3_list_objects(${BUCKET},"",1000).json());
+end _lmcode_
+ ensure(native(p,"list"));let listed=read_json(ROOT+"/listing.json");let cached=file_exists(ROOT+"/remote.json")?read_json(ROOT+"/remote.json"):{};
+ let current=registry_view();let names=[];let listing={};let remote={};
+ for(row in listed){listing[row.key]=row;let old=cached.get(row.key,{});if(full||old.get("etag","")!=row.etag||old.get("last_modified","")!=row.last_modified||current[row.key].round==round){names=concat(names,[row.key]);}else{assert(num(row.size)==old.size);remote[row.key]=old;}}
+ write_file(ROOT+"/head-keys.txt",join(names,"\n"));write_file(ROOT+"/heads.jsonl","");
+ if(names.len()>0){
+ let heads=_lmcode_ cli="lmaws" install="github:lmctl-ai/lmaws@v0.1.23";
+let c=aws.region("us-east-1");file_write(${ROOT+"/attach.json"},c.s3_bucket_attach(${BUCKET},${RUN}));let keys=file_lines(${ROOT+"/head-keys.txt"});for(i in range(0,keys.len())){let h=c.s3_head_object(${BUCKET},keys.at(i));file_append(${ROOT+"/heads.jsonl"},h+"\n");check(!str_contains(h,"\"ok\":false"));}
+end _lmcode_
+ ensure(native(heads,"heads"));}
+ for(line in read_lines(ROOT+"/heads.jsonl")){if(trim(line)==""){continue;}let h=json_parse(line);assert(h.ok&&h.exists,"HEAD failed; private response retained");let l=listing[h.key];assert(num(l.size)==h.size&&l.etag==h.etag&&l.last_modified==h.last_modified,"listing/head disagree");
+ remote[h.key]={size:h.size,etag:h.etag,version:h.get("version_id","")==""?null:h.version_id,checksum_sha256:h.checksum_sha256,metadata:h.metadata,last_modified:h.last_modified,content_type:h.content_type,cache_control:h.cache_control};
+ assert(h.get("checksum_type","")!="COMPOSITE","unexpected composite checksum");
+ let rec=current[h.key];if(rec.round==round){STATE.history=concat(STATE.history,[{key:h.key,round:rec.round,revision:rec.revision,last_modified:h.last_modified}]);}
+ }
+ let local={};for(entry in read_json(ROOT+"/manifest.json").entries){local[entry.key]={size:entry.size,sha256:entry.sha256,md5:entry.md5,content_type:entry.content_type,cache_control:entry.cache_control};}
+ write_json(ROOT+"/local.json",local);write_json(ROOT+"/registry.json",current);write_json(ROOT+"/remote.json",remote);write_json(ROOT+"/history.json",STATE.history);
+ helper(["verify",abs_path(".")]);let check=read_json(ROOT+"/verify-report.json");assert(check.ok,"three-way mismatch; private key/view/round diagnostic retained");STATE.max_skew=max(STATE.max_skew,check.observed_max_skew_seconds);check.heads=names.len();check.full=full;return check;
+}
+fn job(round,fault,kill_after){let plan=plan_job(round);let before=ledger();let confirmed=execute(plan,fault,kill_after);let after=ledger();return {plan:plan,confirmed:confirmed,puts:puts(after)-puts(before)};}
+fn teardown(){
+ if(!file_exists(ROOT+"/create.json")){let summary=ledger();assert(summary.attempts==0,"creation outcome unconfirmed; no unsafe bucket adoption; operator review required");return;}
+ let creation=read_json(ROOT+"/create.json");assert(creation.get("created",false),"cleanup refuses a bucket not created by this test");
+ let p=_lmcode_ cli="lmaws" install="github:lmctl-ai/lmaws@v0.1.23";
+let c=aws.region("us-east-1");file_write(${ROOT+"/cleanup-attach.json"},c.s3_bucket_attach(${BUCKET},${RUN}));
+end _lmcode_
+ ensure(native(p,"cleanup-attach"));let attached=read_json(ROOT+"/cleanup-attach.json");
+ if(attached.get("exists",true)!=false){
+ let listing=_lmcode_ cli="lmaws" install="github:lmctl-ai/lmaws@v0.1.23";
+let c=aws.region("us-east-1");c.s3_bucket_attach(${BUCKET},${RUN});file_write(${ROOT+"/cleanup-list.json"},c.s3_list_objects(${BUCKET},"",1000).json());
+end _lmcode_
+ ensure(native(listing,"cleanup-list"));let keys=[];for(row in read_json(ROOT+"/cleanup-list.json")){keys=concat(keys,[row.key]);}
+ let cleanup=_lmcode_ cli="lmaws" install="github:lmctl-ai/lmaws@v0.1.23";
+let c=aws.region("us-east-1");c.s3_bucket_attach(${BUCKET},${RUN});file_write(${ROOT+"/cleanup-objects.json"},c.s3_delete_objects(${BUCKET},${json_stringify(keys)}).json());
+end _lmcode_
+ ensure(native(cleanup,"cleanup"));for(row in read_json(ROOT+"/cleanup-objects.json")){assert(row.ok=="true","unconfirmed object cleanup");}
+ let drop=_lmcode_ cli="lmaws" install="github:lmctl-ai/lmaws@v0.1.23";
+let c=aws.region("us-east-1");c.s3_bucket_attach(${BUCKET},${RUN});file_write(${ROOT+"/cleanup-bucket.json"},c.s3_bucket_delete(${BUCKET},${RUN}));
+end _lmcode_
+ ensure(native(drop,"drop-bucket"));assert(read_json(ROOT+"/cleanup-bucket.json").ok,"bucket deletion failed; possible versions unsupported");
+ }
+ let proof=_lmcode_ cli="lmaws" install="github:lmctl-ai/lmaws@v0.1.23";
+let c=aws.region("us-east-1");file_write(${ROOT+"/absence.json"},c.s3_bucket_attach(${BUCKET},${RUN}));
+end _lmcode_
+ ensure(native(proof,"absence"));let absent=read_json(ROOT+"/absence.json");assert(absent.exists==false&&absent.http_status==404&&absent.error_code=="NoSuchBucket","independent absence not proved");
+ let summary=ledger();let report=file_exists(ROOT+"/public-results.json")?read_json(ROOT+"/public-results.json"):{status:"failed_before_completion",progress:file_exists(ROOT+"/progress.json")?read_json(ROOT+"/progress.json"):null};report.zero_leftovers_verified=true;if(report.status=="pass_before_teardown"){report.status="pass";report.phases=concat(report.phases,[{phase:"teardown",status:"pass"}]);}report.bucket_absent=true;report.request_counts={};for(op in keys(summary.by_operation)){report.request_counts[op]=summary.by_operation[op].requests;}report.request_attempts=summary.attempts;report.estimated_cost_usd=summary.estimated_cost_usd;report.cap_usd=summary.cap_usd;write_json(ROOT+"/public-results.json",report);
+ println("zero leftovers verified; estimated cost: $"+str(summary.estimated_cost_usd));
+}
+if(MODE=="cleanup"){teardown();exit(0);}
+assert(MODE=="run");
+let probe=_lmcode_ cli="lmaws" install="github:lmctl-ai/lmaws@v0.1.23";
+check(true);
+end _lmcode_
+let version=system(concat(dsl_cli(probe),["--version"]),30000);assert(trim(version.stdout)=="lmaws 0.1.23");
+helper(["prepare",abs_path(".")]);write_file(PLAN,"");write_file(RESULTS,"");
+let create=_lmcode_ cli="lmaws" install="github:lmctl-ai/lmaws@v0.1.23";
+let c=aws.region("us-east-1");file_write(${ROOT+"/create.json"},c.s3_bucket_create_exact(${BUCKET},${RUN}));
+end _lmcode_
+ensure(native(create,"create"));assert(read_json(ROOT+"/create.json").created==true,"fresh test bucket required");
+let initial=job(0,"none",0);assert(initial.plan.adds==100&&initial.plan.changed==0&&initial.plan.deletes==0&&initial.confirmed==100);verify(0,true);phase_rows=concat(phase_rows,[{phase:"first_publish",status:"pass",adds:100}]);
+checkpoint(phase_rows,soak_rows);
+let no_before=ledger();let no=job(0,"none",0);let no_after=ledger();assert(no.plan.operations.len()==0&&no_after.attempts==no_before.attempts);phase_rows=concat(phase_rows,[{phase:"no_change",status:"pass",requests:0}]);
+checkpoint(phase_rows,soak_rows);
+helper(["mutate",abs_path("."),"delta"]);let delta=job(1,"none",0);assert(delta.plan.adds==2&&delta.plan.changed==3&&delta.plan.deletes==2);verify(1,true);phase_rows=concat(phase_rows,[{phase:"change_add_delete",status:"pass",changed:3,adds:2,deletes:2}]);
+checkpoint(phase_rows,soak_rows);
+helper(["mutate",abs_path("."),"generation"]);let crash_before=ledger();let crashed=job(2,"none",40);assert(crashed.confirmed==42,"two deletes and40 uploads confirmed");let retry_plan=plan_job(2);assert(retry_plan.operations.len()==60,"only60 unconfirmed files replanned");execute(retry_plan,"none",0);let crash_after=ledger();assert(puts(crash_after)-puts(crash_before)==100,"confirmed objects uploaded twice");verify(2,true);phase_rows=concat(phase_rows,[{phase:"crash_resume",status:"pass",durable_receipts_replayed:40,replanned:60,total_puts:100,inflight_retries:0}]);
+checkpoint(phase_rows,soak_rows);
+helper(["mutate",abs_path("."),"uncertain"]);let lost=job(3,"lost",0);assert(lost.plan.operations.len()==1&&lost.confirmed==0);let uncertain=plan_job(3);assert(uncertain.operations.len()==1);execute(uncertain,"none",0);verify(3,true);phase_rows=concat(phase_rows,[{phase:"uncertain_result",status:"pass",replanned:1}]);
+checkpoint(phase_rows,soak_rows);
+let current_manifest=read_json(ROOT+"/manifest.json").entries;let entry=current_manifest[0];
+write_file(ROOT+"/conditional-payload.txt","synthetic attempted overwrite\n");
+let conditional=_lmcode_ cli="lmaws" install="github:lmctl-ai/lmaws@v0.1.23";
+let c=aws.region("us-east-1");c.s3_bucket_attach(${BUCKET},${RUN});file_write(${ROOT+"/conditional.json"},c.s3_put_file(${BUCKET},${entry.key},${ROOT+"/conditional-payload.txt"},${json_stringify({if_none_match:"*",expected_sha256:sha256("synthetic attempted overwrite\n"),content_type:entry.content_type,cache_control:entry.cache_control,metadata:{sha256:sha256("synthetic attempted overwrite\n")}})}));
+end _lmcode_
+ensure(native(conditional,"conditional"));let condition=read_json(ROOT+"/conditional.json");assert(!condition.ok&&condition.http_status==412&&!condition.ambiguous);verify(3,true);phase_rows=concat(phase_rows,[{phase:"precondition_412",status:"pass"}]);
+checkpoint(phase_rows,soak_rows);
+let operation_counts={create:0,update:0,touch:0,delete:0,rename:0,recreate:0,noop:0};let faults=0;
+for(n in range(1,num(env("LMFILES_S3_ROUNDS","30"))+1)){
+ helper(["mutate",abs_path("."),"soak-"+str(n)]);let operations=read_json(ROOT+"/operations.json").last_round.operations;for(op in operations){operation_counts[op.applied]=operation_counts[op.applied]+1;}
+ let fault=n==5?"kill":(n==11?"lost":(n==17?"failed":"none"));let outcome=job(n+10,fault,fault=="kill"?1:0);
+ if(fault!="none"){faults=faults+1;let remaining=plan_job(n+10);assert(remaining.operations.len()>0 ||fault=="kill");execute(remaining,"none",0);}
+ let converged=plan_job(n+10);assert(converged.operations.len()==0,"round did not converge");let checked=verify(n+10,false);soak_rows=concat(soak_rows,[{round:n,status:"pass",operations:read_json(ROOT+"/operations.json").last_round.operations.len(),fault:fault,converged:true}]);
+checkpoint(phase_rows,soak_rows);
+ println("soak round "+str(n)+" converged");
+}
+let final=verify(40,true);write_json(ROOT+"/public-results.json",{status:"pass_before_teardown",host_version:"0.1.23",phases:concat(phase_rows,[{phase:"seeded_soak",status:"pass"},{phase:"three_way_reconciliation",status:"pass"}]),soak:{seed:20261027,rounds:soak_rows.len(),operations_by_type:operation_counts,faults_injected:faults,converged:true,rounds_summary:soak_rows},reconciliation:{key_sets:"pass",sizes:"pass",sha256:"pass",etag_md5:"pass",version_headers:"pass",timestamps:"pass",revision_order:"pass",independent_model:"pass"},observed_max_skew_seconds:STATE.max_skew,listing_rebuild_verified:false,zero_leftovers_verified:false});
+# Explicit listing import follows after final reconciliation; never infer upload history from listing.
+let import_before=ledger();verify(40,true);let import_after=ledger();assert(import_after.attempts>import_before.attempts);
+let old_catalog=STATE.catalog;remove_file(DB);if(file_exists(DB+".lock")){remove_file(DB+".lock");}STATE.catalog={};write_file(PLAN,"");write_file(RESULTS,"");
+let remote=read_json(ROOT+"/remote.json");let entries=read_json(ROOT+"/manifest.json").entries;
+for(entry in entries){let h=remote[entry.key];let IDENTITY=json_stringify({id:entry.key});let FIELDS=json_stringify({content_hash:entry.sha256,size:str(entry.size)});
+ let import_item=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
+let db=registry.open(${DB},"s3-live","{}");file_write(${ROOT+"/import-item.json"},db.item_upsert(${IDENTITY},${FIELDS}));db.close();
+end _lmcode_
+ ensure(native(import_item,"import-item"));let item=read_json(ROOT+"/import-item.json");STATE.catalog[entry.key]=item.item;
+ let IMPORT=json_stringify({stage:"published",namespace:BUCKET,status:"ok",source_revision:item.revision,source_fingerprint:{hash:entry.sha256,size:str(entry.size)},metadata:{present:true,key:entry.key,size:entry.size,sha256:entry.sha256,etag:h.etag,version:h.version,round:40,remote_last_modified:h.last_modified,provenance:"explicit_s3_listing_head",original_upload_times:null}});
+ let import_record=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
+let db=registry.open(${DB},"s3-live","{}");db.stage_record(${item.item},${IMPORT});db.close();
+end _lmcode_
+ ensure(native(import_record,"import-record"));
+}
+write_json(ROOT+"/catalog.json",STATE.catalog);let rebuild_before=ledger();let rebuilt=plan_job(40);let rebuild_after=ledger();assert(rebuilt.operations.len()==0&&rebuild_after.attempts==rebuild_before.attempts);let report=read_json(ROOT+"/public-results.json");let imported=registry_view();assert(keys(imported).len()==keys(remote).len());for(key in keys(remote)){assert(imported[key].sha256==remote[key].metadata.sha256&&imported[key].etag==remote[key].etag&&imported[key].size==remote[key].size,"rebuild mismatch");}
+report.listing_rebuild_verified=true;report.phases=concat(report.phases,[{phase:"listing_rebuild",status:"pass"}]);report.listing_import_requests=import_after.attempts-import_before.attempts;report.rebuilt_plan_requests=0;write_json(ROOT+"/public-results.json",report);
+# Supervisor invokes this same file in cleanup mode, including on any failure.

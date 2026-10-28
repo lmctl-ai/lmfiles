@@ -129,7 +129,9 @@ def soak_plan(seed=SEED, rounds=ROUNDS, initial=None):
 def timestamp_ms(value):
     if not isinstance(value, str):
         raise ValueError('timestamp must be an aware ISO-8601 string')
-    date = datetime.datetime.fromisoformat(value.replace('Z', '+00:00'))
+    # Java Instant emits up to9 fractional digits; Python3.10 accepts at most6.
+    normalized = re.sub(r'(\.\d{6})\d+(?=Z$|[+-]\d\d:\d\d$)', r'\1', value)
+    date = datetime.datetime.fromisoformat(normalized.replace('Z', '+00:00'))
     if date.utcoffset() is None:
         raise ValueError('timestamp must include a timezone')
     return round(date.timestamp() * 1000)

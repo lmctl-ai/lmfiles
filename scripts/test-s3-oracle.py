@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Unit checks of independent model/reconciliation, not a live or fake S3 run."""
 import base64,copy,unittest
-from s3_correctness_oracle import Model,SEED,ROUNDS,PUT_CAP,fingerprint,reconcile,soak_plan
+from s3_correctness_oracle import Model,SEED,ROUNDS,PUT_CAP,fingerprint,reconcile,soak_plan,timestamp_ms
 
 class OracleChecks(unittest.TestCase):
     def views(self):
@@ -10,6 +10,13 @@ class OracleChecks(unittest.TestCase):
         registry={'synthetic-000.txt':dict(present=True,status='ok',confirmed=True,size=f['size'],sha256=f['sha256'],etag='"'+f['md5']+'"',version=None,request_started='2026-01-01T00:00:00Z',confirmed_at='2026-01-01T00:00:02Z',round=1,revision=1)}
         remote={'synthetic-000.txt':dict(size=f['size'],etag='"'+f['md5']+'"',version=None,checksum_sha256=base64.b64encode(bytes.fromhex(f['sha256'])).decode(),last_modified='2026-01-01T00:00:01Z',content_type=f['content_type'],cache_control=f['cache_control'])}
         return local,registry,remote
+
+    def test_java_instant_nanosecond_timestamps(self):
+        self.assertEqual(timestamp_ms('2026-01-01T00:00:00.123456789Z'),timestamp_ms('2026-01-01T00:00:00.123456Z'))
+        local,registry,remote=self.views()
+        registry['synthetic-000.txt']['request_started']='2026-01-01T00:00:00.123456789Z'
+        registry['synthetic-000.txt']['confirmed_at']='2026-01-01T00:00:02.123456789Z'
+        self.assertTrue(reconcile(local,registry,remote)['ok'])
 
     def test_exact_three_way_match(self):
         local,registry,remote=self.views()

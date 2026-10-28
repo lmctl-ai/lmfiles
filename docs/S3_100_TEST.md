@@ -1,66 +1,78 @@
-# Bounded real S3 correctness test: blocked before AWS
+# Bounded real S3 correctness test
 
 The Lead authorized **one** functional test with100 synthetic objects, profile
 `lmaws` only, region `us-east-1`, exact bucket `lmaws-lmfiles-<runid>`, tag
 `lmaws_test=<runid>`, custom run ID and default$0.05 ledger cap. No admin/default
 writes, AWS CLI, other buckets, large uploads, scale or performance measurements.
 
-The test is **not implemented or executed end to end** because released lmaws
-v0.1.22 lacks necessary bindings. The self-executing capability preflight is:
+The full one-job driver is now implemented in
+[upload_s3_live.lms](../examples/upload_s3_live.lms). The public autorun requires
+explicit `--live` and a unique synthetic run ID, then bootstraps the same job and
+its Linux process/cleanup supervisor from this repository:
 
 ```sh
-AWS_PROFILE=lmaws lmctl https://raw.githubusercontent.com/lmctl-ai/lmfiles/main/examples/upload_s3_100_preflight.lms syntheticrun01
+AWS_PROFILE=lmaws lmctl https://raw.githubusercontent.com/lmctl-ai/lmfiles/main/examples/upload_s3_live.lms --live UNIQUE_SYNTHETIC_RUN_ID
 ```
 
-It auto-installs the pinned release when needed, requires version0.1.22, calls
-only `--version`/`--dsl-schema`, writes a private sanitized preflight report under
-`.lmfiles-local/s3-100/`, prints BLOCKED and exits2. Its lmcode block is never
-executed. No AWS session, identity lookup, SDK operation or bucket creation occurs. No cost
-ledger is opened; the zero-request count follows from version/schema-only
-execution, not a live request ledger or remote inventory.
-An older binary on PATH is refused rather than silently used. No credentials are
-read by this preflight. `scripts/test-s3-preflight.py` checks the expected blocked
-exit, both profile rejections and sanitized output; it does not run AWS.
+From a checkout, the equivalent test entry is:
 
-## Missing release capabilities
+```sh
+AWS_PROFILE=lmaws python3 scripts/test-s3-live.py --live --run-id UNIQUE_SYNTHETIC_RUN_ID
+```
 
-| Required behavior | Released0.1.22 limitation |
-|---|---|
-| Exact named/tagged bucket, recoverable after executor kill | Run.bucket constructs `lmaws-<runid>-<suffix>`; process-owned Run state cannot reattach the persisted bucket; closing the Run cleans it |
-| File PUT with integrity, Content-Type and Cache-Control | Run.put(Row,key,string) returns void and exposes no header/checksum/structured receipt options |
-| If-None-Match and distinguish412 from ambiguous failure | No conditional generic PUT binding |
-| Independently list every object and compare metadata | No generic object-list or HEAD-object binding; account bucket inventory is not an object inventory |
-| Selectively delete2 objects and record per-key outcomes | No generic delete-object(s) binding; whole-run cleanup is not selective deletion |
-| Persistent request/cost evidence across executor recovery | Needs an explicit recovered operation/receipt ledger contract rather than process-local Run tracking |
+The supervisor auto-installs pinned **lmaws v0.1.23** and released lmfiles, forces
+only the lmaws profile/us-east-1/default$0.05 cap, uses one persistent private
+ledger directory across restarts, and invokes only this one LMScript for AWS
+policy/actions. On failure it stops/reaps the executor tree before invoking the
+same script in cleanup mode. A bucket not proved created by this test is never
+adopted for deletion. Raw receipts/diagnostics stay under git-ignored
+`.lmfiles-local/live-<runid>/`; only sanitized counts/status are published.
 
-The existing design requests `s3_put_file`, `s3_head_object` and
-`s3_delete_objects`; exact-name bucket create/delete and bounded object-list
-bindings are also needed. These are proposed small additions, not APIs claimed to
-exist. Implement them with generic run ownership/ledger guards and fake tests in
-lmaws, then publish an approved usable host before enabling the live driver.
-Do not weaken sandbox ownership checks or bypass lmaws via another SDK/CLI.
+The old0.1.22 capability block is resolved. Preflight now requires these actual
+0.1.23 bindings: s3_bucket_create_exact, s3_bucket_attach, s3_bucket_delete,
+s3_put_file, s3_head_object, s3_list_objects, s3_delete_objects and
+s3_ledger_summary. The preflight opens no AWS session; READY means signatures,
+not a live success. Every restarted executor explicitly attaches. The zero-change
+job never creates a cloud session and compares local ledger summaries before/after.
 
-`s3_upload_check` is unsuitable: its source explicitly uses default for PUT,
-controls a different fixed smoke test and does not implement these phases. It was
-not invoked. No IAM denial occurred, so there is no denied action/resource/
-condition to report. No profile or policy was changed.
+Full LIST+HEAD/checksum/header verification covers every object after each scripted
+phase and at final reconciliation/import. Each soak round does a fresh listing
+and HEADs changed objects; unchanged metadata comes from the test's previous HEAD
+only when listing ETag/LastModified/size still agree. Final reconciliation always
+re-HEADs every object. None of this verification data determines normal upload
+plans; the job selects solely from lmfiles and the local tree.
+
+A kill after40 durable SDK receipts tests replay before replan (60 remaining,
+100 total PUT attempts). Soak kill occurs before the application receipt is
+written, exercising the one uncertain retry. Lost-response injection discards a
+successful SDK receipt at the application boundary; it does not claim a real
+network outage. Failed-upload injection uses the host's LocalChecksumMismatch
+refusal, which is non-ambiguous and performs no PUT. Conditional412 uses different
+bytes and independently verifies the old object survived.
+
+`scripts/test-s3-live-wire.py` runs the entire driver against an actual SDK
+loopback S3 service, including30 rounds, all fault types, import and cleanup.
+It passed with248 PUT attempts and1433 total reservations. These are fixture
+counts, not published live results. Nanosecond Java Instant input exposed a
+Python3.10 oracle parsing bug; normalization and a regression case fix it.
+The local gates pass; the authorized live run is next.
 
 ## Phase disposition
 
 | Phase | Status | Required assertion when unblocked |
 |---|---|---|
-| First publish | NOT RUN—release API gap |100 adds, confirmed receipts, independent verification |
-| No-change | NOT RUN—release API gap | Empty plan; zero AWS requests, including ownership/credential probes |
-| Change/add/delete | NOT RUN—release API gap |3 changed uploads +2 adds +2 deletes |
-| Kill/resume | NOT RUN—release API gap | Only unconfirmed work replanned;100 PUTs plus at most1 in-flight retry |
-| Uncertain/412 | NOT RUN—release API gap | Ambiguous result unconfirmed;412 never overwrites existing content |
-| Seeded soak | NOT RUN—release API gap |30 rounds, seed20261027, all7 operation types, fault/recovery checks |
-| Three-way reconciliation | NOT RUN—release API gap | S3 listing/metadata, registry belief and actual local files agree |
-| Listing-import rebuild | NOT RUN—release API gap | Lose DB; explicitly import verified remote state; next plan empty |
-| Independent verification | NOT RUN—release API gap | Exact key set, sizes, hashes/ETags, Content-Type and Cache-Control |
-| Teardown/absence | NOT RUN—nothing created | Delete owned objects/bucket and independently prove absence |
+| First publish | PENDING LIVE |100 adds, confirmed receipts, independent verification |
+| No-change | PENDING LIVE | Empty plan; zero AWS requests, including ownership/credential probes |
+| Change/add/delete | PENDING LIVE |3 changed uploads +2 adds +2 deletes |
+| Kill/resume | PENDING LIVE | Only unconfirmed work replanned;100 PUTs plus at most1 in-flight retry |
+| Uncertain/412 | PENDING LIVE | Ambiguous result unconfirmed;412 never overwrites existing content |
+| Seeded soak | PENDING LIVE |30 rounds, seed20261027, all7 operation types, fault/recovery checks |
+| Three-way reconciliation | PENDING LIVE | S3 listing/metadata, registry belief and actual local files agree |
+| Listing-import rebuild | PENDING LIVE | Lose DB; explicitly import verified remote state; next plan empty |
+| Independent verification | PENDING LIVE | Exact key set, sizes, hashes/ETags, Content-Type and Cache-Control |
+| Teardown/absence | PENDING LIVE | Delete owned objects/bucket and independently prove absence |
 
-Created resources=0, AWS requests=0, estimated cost=$0.00. This is a preflight
+Historical0.1.22 preflight: created resources=0, AWS requests=0, estimated cost=$0.00. This is a preflight
 safety result, **not an independent remote absence proof** and not a successful
 live upload test. Sanitized evidence: [S3_100_RESULTS.json](S3_100_RESULTS.json).
 The roughly$0.002 intended live estimate remains unmeasured. No test upload, tag,
@@ -141,9 +153,8 @@ Additional SHA256 checksums are canonical Base64 full-object32-byte SHA256; do n
 compare a multipart/composite checksum to a local full-object hash. If both an
 additional checksum and metadata SHA256 exist, require them to agree. LIST does
 not return user metadata or headers: obtain them via the test's explicit HEAD
-with ChecksumMode or GetObjectAttributes path. The release lacks even generic
-HEAD/list bindings, so these extra receipt fields must be supplied/tested when
-that host API is added. Never substitute ETag for SHA256.
+with ChecksumMode or GetObjectAttributes path. Release0.1.23 supplies those bindings; receipts and headers are checked by the
+driver. Never substitute ETag for SHA256.
 
 Record request-start immediately before dispatch and confirmation time only after
 a successful response plus durable receipt. Compute observed skew as the largest
@@ -195,7 +206,6 @@ admission, missing/extra keys, stale deletion beliefs, hashes, metadata fallback
 ETag/version/headers, unconfirmed beliefs, timestamps and ordering. Nine local
 unit tests pass; they do not imply any live round converged.
 
-The extended preflight publishes30 NOT RUN round summaries,10 NOT RUN phases and
-eight NOT RUN reconciliation checks. Actual operations/faults=0, converged=null,
-observed max skew=null, rebuilt=false. Missing released APIs still block the same
-live test. No additional bucket, AWS session or live request was introduced.
+The preflight still publishes only NOT RUN summaries and never executes AWS.
+The full loopback driver passed all phases. Live results will replace the
+historical blocked report only after the authorized run and independent teardown.
