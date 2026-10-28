@@ -1,6 +1,6 @@
 # Examples
 
-Nine self-executing .lms jobs create synthetic artifacts and images. frontier,
+Ten self-executing .lms jobs create synthetic artifacts and images. frontier,
 revisions, claims, snapshots and journal_resume reset only their private synthetic
 fixture DBs. publish_ttl keeps state: repeat run is no-op; changed selects one
 revision; uncertain deliberately omits a result, so the next run retries it.
@@ -31,3 +31,10 @@ temporary names, rename, and query-driven skips; no remote listing/checksum call
 and resume, digest validation, local corruption and host-key refusal. A new remote
 partial must first be created: only reput's explicit missing-remote error selects
 initial put; other failures remain failures. All fixtures are temporary/synthetic.
+
+`upload_s3_live.lms` is the completed one-job live S3 pairing. Public autorun needs
+--live and a unique synthetic ID; bootstrap invokes Linux scripts/test-s3-live.py
+for process-tree control and mandatory cleanup. Only lmaws/profile,us-east-1,
+pinnedhost0.1.23 and one matching-tag bucket; persistentcap$0.05. The supervisor
+runs local PUT audit after cleanup. `render-s3-results.lms` renders the sanitized
+actual operation chart. See docs/S3_100_TEST.md; no default/CI live execution.

@@ -263,4 +263,4 @@ def reconcile(local, registry, remote, history=(), tolerance_seconds=300, expect
     except (KeyError, TypeError, ValueError):
         mismatch(None, 'history', 'invalid_timestamp_ordering_input')
     return dict(ok=not errors, local_keys=len(local), registry_keys=len(believed), s3_keys=len(remote),
-                observed_max_skew_seconds=maximum_skew / 1000 if valid_intervals else None, mismatches=errors)
+                observed_max_skew_seconds=maximum_skew / 1000 if valid_intervals else None, valid_intervals=valid_intervals, mismatches=errors)

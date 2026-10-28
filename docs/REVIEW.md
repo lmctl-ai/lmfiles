@@ -203,6 +203,6 @@ The general indexes/cursors/archive/mailbox portion of1C remains deferred.
 The historical10k observations above remain informational. Performance and scale
 measurement are not planned; no100M or large-upload qualification is a goal. Scan
 gates now use1,000 small synthetic files for functional cases and emit no timing
-or throughput report. The authorized100-object live S3 test is blocked before
-AWS by released lmaws0.1.22 API gaps; see S3_100_TEST.md. No IAM denial or cloud
-resource creation occurred.
+or throughput report. The authorized100-object live S3 test subsequently passed with released
+lmaws0.1.23, including30 seeded rounds, reconciliation, import and zero-leftover
+proof; see S3_100_TEST.md. No IAM denial occurred.

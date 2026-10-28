@@ -9,6 +9,22 @@ oracle = importlib.util.module_from_spec(spec); assert spec.loader; spec.loader.
 
 
 class LiveOracleTests(unittest.TestCase):
+    def test_verify_rehashes_actual_files_without_refreshing_manifest(self):
+        with tempfile.TemporaryDirectory(prefix="lmfiles-s3-live-") as directory:
+            root=pathlib.Path(directory);oracle.prepare(root);work=oracle.state_dir(root)
+            entries=json.loads((work/"manifest.json").read_text())["entries"]
+            local={e["key"]:{k:e[k] for k in ("size","sha256","md5","content_type","cache_control")} for e in entries}
+            registry={k:dict(present=True,status="ok",confirmed=True,size=v["size"],sha256=v["sha256"],etag=v["md5"],version=None,request_started="2026-01-01T00:00:00Z",confirmed_at="2026-01-01T00:00:02Z",round=0,revision=1) for k,v in local.items()}
+            remote={k:dict(size=v["size"],etag=v["md5"],version=None,metadata={"sha256":v["sha256"]},last_modified="2026-01-01T00:00:01Z",content_type=v["content_type"],cache_control=v["cache_control"]) for k,v in local.items()}
+            for name,value in [("local",local),("registry",registry),("remote",remote),("history",[])]:
+                (work/(name+".json")).write_text(json.dumps(value))
+            self.assertTrue(oracle.verify(root)["ok"])
+            target=work/"tree"/"synthetic-000.txt";original=target.read_bytes();target.write_bytes(b"modified after manifest")
+            self.assertFalse(oracle.verify(root)["ok"])
+            target.write_bytes(original);extra=work/"tree"/"unexpected.txt";extra.write_text("extra")
+            self.assertFalse(oracle.verify(root)["ok"])
+            extra.unlink();target.unlink();self.assertFalse(oracle.verify(root)["ok"])
+
     def test_prepare_manifest_is_deterministic_and_bounded(self):
         with tempfile.TemporaryDirectory(prefix="lmfiles-s3-live-") as td:
             root = pathlib.Path(td); first = oracle.prepare(root)
@@ -90,6 +106,35 @@ class LiveOracleTests(unittest.TestCase):
             report = oracle.verify(root)
             self.assertFalse(report["ok"])  # expected model intentionally contains all 100 keys
             self.assertTrue((oracle.state_dir(root) / "verify-report.json").is_file())
+
+    def test_import_reads_only_remote_snapshot(self):
+        with tempfile.TemporaryDirectory(prefix="lmfiles-s3-live-") as td:
+            root = pathlib.Path(td); work = oracle.state_dir(root); work.mkdir(parents=True)
+            digest = "ab" * 32
+            remote = {"remote-key": {"size": 7, "etag": '"etag7"', "version": "v1",
+                "metadata": {"sha256": digest}, "last_modified": "2026-01-01T00:00:01Z",
+                "content_type": "text/plain", "cache_control": "max-age=60"}}
+            (work / "remote.json").write_text(json.dumps(remote))
+            result = oracle.import_remote(root)
+            self.assertEqual(result["count"], 1)
+            row = result["rows"][0]
+            self.assertEqual(row["fields"], {"content_hash": digest, "size": "7"})
+            self.assertIsNone(row["metadata"]["original_upload_times"])
+            self.assertIsNone(row["metadata"]["round"])
+            self.assertNotIn("request_started", json.dumps(row))
+            self.assertFalse((work / "tree").exists())
+            self.assertFalse((work / "modelstate.json").exists())
+
+    def test_import_rejects_checksum_disagreement_and_unknown_client_time(self):
+        with tempfile.TemporaryDirectory(prefix="lmfiles-s3-live-") as td:
+            root = pathlib.Path(td); work = oracle.state_dir(root); work.mkdir(parents=True)
+            row = {"size": 1, "etag": "e", "checksum_sha256": base64.b64encode(b"a" * 32).decode(),
+                   "metadata": {"sha256": "b" * 64}, "last_modified": "2026-01-01T00:00:01Z"}
+            (work / "remote.json").write_text(json.dumps({"k": row}))
+            with self.assertRaises(ValueError): oracle.import_remote(root)
+            row["metadata"] = {"sha256": "a" * 64}; row["last_modified"] = "2026-01-01T00:00:01"
+            (work / "remote.json").write_text(json.dumps({"k": row}))
+            with self.assertRaises(ValueError): oracle.import_remote(root)
 
 
 if __name__ == "__main__": unittest.main()

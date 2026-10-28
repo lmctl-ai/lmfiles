@@ -13,20 +13,20 @@ and alias layouts if justified, broader raw POSIX path I/O. Scanning does not
 infer deletion or safely skip directory contents
 from directory mtime alone. Stat-preserving writers need always_hash.
 
-Only one100-object S3 correctness run is now authorized (profile lmaws, exact
-lmaws-lmfiles-<runid> bucket, us-east-1, matching run tag, cap$0.05). It is blocked
-before AWS by released lmaws0.1.22 API gaps; see docs/S3_100_TEST.md. No resource
-was created and no remote absence proof was attempted. Existing upload examples
-still use the local executor. SFTP examples require installed sshd on Linux and strict temporary
-known_hosts. Native macOS/Windows support remains separately unverified.
+The authorized100-object/30-round S3 run is COMPLETE using released lmaws0.1.23,
+profile lmaws only, us-east-1, one exact tagged bucket, cap$0.05. All phases,
+reconciliation and listing-import no-op passed. Independent fresh-executor
+NoSuchBucket/404 proves zero leftovers.1433 requests,estimated$0.0018854,maxskew
+1.081s. Raw receipts stay private; docs/S3_100_RESULTS.json is sanitized.
+No further live run is implicitly authorized by the published example.
 
 SDK JSON numbers use Double: use decimal strings for64bit metadata. SDK cache
 arena credits on close and PlanLog.unconfirmed per-line fsync optimization remain
 review lows11/12; no guarantees were weakened. Lead owns future releases.
 
-The same blocked S3 test now includes30 seeded rounds (seed20261027), an independent
+The completed S3 test includes30 seeded rounds (seed20261027), the independent
 model/three-way oracle, checksum/timestamp reconciliation and explicit listing
-import after DB loss. No live rounds ran; no max skew or convergence is claimed.
+import after DB loss. Every round converged.
 Original client upload intervals cannot be reconstructed from listing alone.
 
 Latest Lead override authorizes a LOCAL1M/5M/20M correctness ramp independently

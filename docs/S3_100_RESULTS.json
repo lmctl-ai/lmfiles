@@ -1,324 +1,966 @@
 {
-  "status": "blocked_release_api",
-  "host_version": "0.1.22",
-  "missing_api": [
-    "s3_put_file",
-    "s3_head_object",
-    "s3_list_objects",
-    "s3_delete_objects",
-    "s3_bucket_create",
-    "s3_bucket_delete"
-  ],
-  "objects_requested": 100,
-  "buckets_created": 0,
-  "objects_created": 0,
-  "aws_requests": 0,
-  "ledger_opened": false,
-  "request_count_basis": "version_and_schema_only_no_aws_execution",
-  "estimated_cost_usd": 0,
-  "remote_absence_verified": false,
+  "status": "pass",
+  "host_version": "0.1.23",
   "phases": [
     {
       "phase": "first_publish",
-      "status": "not_run_release_api_gap"
+      "status": "pass",
+      "adds": 100
     },
     {
-      "phase": "no_change_zero_requests",
-      "status": "not_run_release_api_gap"
+      "phase": "no_change",
+      "status": "pass",
+      "requests": 0
     },
     {
       "phase": "change_add_delete",
-      "status": "not_run_release_api_gap"
+      "status": "pass",
+      "changed": 3,
+      "adds": 2,
+      "deletes": 2
     },
     {
       "phase": "crash_resume",
-      "status": "not_run_release_api_gap"
+      "status": "pass",
+      "durable_receipts_replayed": 40,
+      "replanned": 60,
+      "total_puts": 100,
+      "inflight_retries": 0
     },
     {
-      "phase": "uncertain_and_412",
-      "status": "not_run_release_api_gap"
+      "phase": "uncertain_result",
+      "status": "pass",
+      "replanned": 1
+    },
+    {
+      "phase": "precondition_412",
+      "status": "pass"
     },
     {
       "phase": "seeded_soak",
-      "status": "not_run_release_api_gap"
+      "status": "pass"
     },
     {
       "phase": "three_way_reconciliation",
-      "status": "not_run_release_api_gap"
+      "status": "pass"
     },
     {
-      "phase": "listing_import_rebuild",
-      "status": "not_run_release_api_gap"
-    },
-    {
-      "phase": "independent_verification",
-      "status": "not_run_release_api_gap"
+      "phase": "listing_rebuild",
+      "status": "pass"
     },
     {
       "phase": "teardown",
-      "status": "not_run_release_api_gap"
+      "status": "pass"
     }
   ],
   "soak": {
     "seed": 20261027,
-    "rounds_planned": 30,
-    "rounds_executed": 0,
-    "object_put_cap": 400,
-    "operations_executed": 0,
-    "faults_planned": [
-      "kill",
-      "lost_response",
-      "failed_upload"
-    ],
-    "faults_injected": 0,
-    "converged": null,
-    "rounds": [
+    "rounds": 30,
+    "operations_by_type": {
+      "create": 7,
+      "update": 16,
+      "touch": 20,
+      "delete": 16,
+      "rename": 7,
+      "recreate": 8,
+      "noop": 46
+    },
+    "faults_injected": 3,
+    "converged": true,
+    "rounds_summary": [
       {
         "round": 1,
-        "status": "not_run_release_api_gap",
-        "operations": null,
-        "faults_injected": 0,
-        "converged": null
+        "status": "pass",
+        "operations": 4,
+        "fault": "none",
+        "converged": true,
+        "operations_by_type": {
+          "create": 0,
+          "update": 1,
+          "touch": 0,
+          "delete": 2,
+          "rename": 0,
+          "recreate": 0,
+          "noop": 1
+        },
+        "planned_puts": 1,
+        "planned_deletes": 2,
+        "put_attempts": 1
       },
       {
         "round": 2,
-        "status": "not_run_release_api_gap",
-        "operations": null,
-        "faults_injected": 0,
-        "converged": null
+        "status": "pass",
+        "operations": 4,
+        "fault": "none",
+        "converged": true,
+        "operations_by_type": {
+          "create": 0,
+          "update": 1,
+          "touch": 2,
+          "delete": 0,
+          "rename": 0,
+          "recreate": 0,
+          "noop": 1
+        },
+        "planned_puts": 1,
+        "planned_deletes": 0,
+        "put_attempts": 1
       },
       {
         "round": 3,
-        "status": "not_run_release_api_gap",
-        "operations": null,
-        "faults_injected": 0,
-        "converged": null
+        "status": "pass",
+        "operations": 4,
+        "fault": "none",
+        "converged": true,
+        "operations_by_type": {
+          "create": 0,
+          "update": 0,
+          "touch": 1,
+          "delete": 0,
+          "rename": 2,
+          "recreate": 0,
+          "noop": 1
+        },
+        "planned_puts": 2,
+        "planned_deletes": 2,
+        "put_attempts": 2
       },
       {
         "round": 4,
-        "status": "not_run_release_api_gap",
-        "operations": null,
-        "faults_injected": 0,
-        "converged": null
+        "status": "pass",
+        "operations": 4,
+        "fault": "none",
+        "converged": true,
+        "operations_by_type": {
+          "create": 1,
+          "update": 0,
+          "touch": 0,
+          "delete": 0,
+          "rename": 0,
+          "recreate": 1,
+          "noop": 2
+        },
+        "planned_puts": 2,
+        "planned_deletes": 0,
+        "put_attempts": 2
       },
       {
         "round": 5,
-        "status": "not_run_release_api_gap",
-        "operations": null,
-        "faults_injected": 0,
-        "converged": null
+        "status": "pass",
+        "operations": 4,
+        "fault": "kill",
+        "converged": true,
+        "operations_by_type": {
+          "create": 0,
+          "update": 1,
+          "touch": 0,
+          "delete": 1,
+          "rename": 0,
+          "recreate": 0,
+          "noop": 2
+        },
+        "planned_puts": 1,
+        "planned_deletes": 1,
+        "put_attempts": 2
       },
       {
         "round": 6,
-        "status": "not_run_release_api_gap",
-        "operations": null,
-        "faults_injected": 0,
-        "converged": null
+        "status": "pass",
+        "operations": 4,
+        "fault": "none",
+        "converged": true,
+        "operations_by_type": {
+          "create": 0,
+          "update": 0,
+          "touch": 1,
+          "delete": 0,
+          "rename": 1,
+          "recreate": 0,
+          "noop": 2
+        },
+        "planned_puts": 1,
+        "planned_deletes": 1,
+        "put_attempts": 1
       },
       {
         "round": 7,
-        "status": "not_run_release_api_gap",
-        "operations": null,
-        "faults_injected": 0,
-        "converged": null
+        "status": "pass",
+        "operations": 4,
+        "fault": "none",
+        "converged": true,
+        "operations_by_type": {
+          "create": 1,
+          "update": 0,
+          "touch": 1,
+          "delete": 0,
+          "rename": 0,
+          "recreate": 0,
+          "noop": 2
+        },
+        "planned_puts": 1,
+        "planned_deletes": 0,
+        "put_attempts": 1
       },
       {
         "round": 8,
-        "status": "not_run_release_api_gap",
-        "operations": null,
-        "faults_injected": 0,
-        "converged": null
+        "status": "pass",
+        "operations": 4,
+        "fault": "none",
+        "converged": true,
+        "operations_by_type": {
+          "create": 0,
+          "update": 0,
+          "touch": 0,
+          "delete": 0,
+          "rename": 0,
+          "recreate": 0,
+          "noop": 4
+        },
+        "planned_puts": 0,
+        "planned_deletes": 0,
+        "put_attempts": 0
       },
       {
         "round": 9,
-        "status": "not_run_release_api_gap",
-        "operations": null,
-        "faults_injected": 0,
-        "converged": null
+        "status": "pass",
+        "operations": 4,
+        "fault": "none",
+        "converged": true,
+        "operations_by_type": {
+          "create": 0,
+          "update": 0,
+          "touch": 1,
+          "delete": 0,
+          "rename": 0,
+          "recreate": 0,
+          "noop": 3
+        },
+        "planned_puts": 0,
+        "planned_deletes": 0,
+        "put_attempts": 0
       },
       {
         "round": 10,
-        "status": "not_run_release_api_gap",
-        "operations": null,
-        "faults_injected": 0,
-        "converged": null
+        "status": "pass",
+        "operations": 4,
+        "fault": "none",
+        "converged": true,
+        "operations_by_type": {
+          "create": 0,
+          "update": 0,
+          "touch": 0,
+          "delete": 0,
+          "rename": 0,
+          "recreate": 0,
+          "noop": 4
+        },
+        "planned_puts": 0,
+        "planned_deletes": 0,
+        "put_attempts": 0
       },
       {
         "round": 11,
-        "status": "not_run_release_api_gap",
-        "operations": null,
-        "faults_injected": 0,
-        "converged": null
+        "status": "pass",
+        "operations": 4,
+        "fault": "lost",
+        "converged": true,
+        "operations_by_type": {
+          "create": 0,
+          "update": 2,
+          "touch": 2,
+          "delete": 0,
+          "rename": 0,
+          "recreate": 0,
+          "noop": 0
+        },
+        "planned_puts": 2,
+        "planned_deletes": 0,
+        "put_attempts": 3
       },
       {
         "round": 12,
-        "status": "not_run_release_api_gap",
-        "operations": null,
-        "faults_injected": 0,
-        "converged": null
+        "status": "pass",
+        "operations": 4,
+        "fault": "none",
+        "converged": true,
+        "operations_by_type": {
+          "create": 0,
+          "update": 0,
+          "touch": 0,
+          "delete": 0,
+          "rename": 0,
+          "recreate": 0,
+          "noop": 4
+        },
+        "planned_puts": 0,
+        "planned_deletes": 0,
+        "put_attempts": 0
       },
       {
         "round": 13,
-        "status": "not_run_release_api_gap",
-        "operations": null,
-        "faults_injected": 0,
-        "converged": null
+        "status": "pass",
+        "operations": 4,
+        "fault": "none",
+        "converged": true,
+        "operations_by_type": {
+          "create": 0,
+          "update": 1,
+          "touch": 2,
+          "delete": 0,
+          "rename": 0,
+          "recreate": 0,
+          "noop": 1
+        },
+        "planned_puts": 1,
+        "planned_deletes": 0,
+        "put_attempts": 1
       },
       {
         "round": 14,
-        "status": "not_run_release_api_gap",
-        "operations": null,
-        "faults_injected": 0,
-        "converged": null
+        "status": "pass",
+        "operations": 4,
+        "fault": "none",
+        "converged": true,
+        "operations_by_type": {
+          "create": 0,
+          "update": 0,
+          "touch": 0,
+          "delete": 3,
+          "rename": 0,
+          "recreate": 0,
+          "noop": 1
+        },
+        "planned_puts": 0,
+        "planned_deletes": 3,
+        "put_attempts": 0
       },
       {
         "round": 15,
-        "status": "not_run_release_api_gap",
-        "operations": null,
-        "faults_injected": 0,
-        "converged": null
+        "status": "pass",
+        "operations": 4,
+        "fault": "none",
+        "converged": true,
+        "operations_by_type": {
+          "create": 0,
+          "update": 0,
+          "touch": 0,
+          "delete": 1,
+          "rename": 1,
+          "recreate": 1,
+          "noop": 1
+        },
+        "planned_puts": 2,
+        "planned_deletes": 2,
+        "put_attempts": 2
       },
       {
         "round": 16,
-        "status": "not_run_release_api_gap",
-        "operations": null,
-        "faults_injected": 0,
-        "converged": null
+        "status": "pass",
+        "operations": 4,
+        "fault": "none",
+        "converged": true,
+        "operations_by_type": {
+          "create": 0,
+          "update": 0,
+          "touch": 1,
+          "delete": 1,
+          "rename": 1,
+          "recreate": 1,
+          "noop": 0
+        },
+        "planned_puts": 2,
+        "planned_deletes": 2,
+        "put_attempts": 2
       },
       {
         "round": 17,
-        "status": "not_run_release_api_gap",
-        "operations": null,
-        "faults_injected": 0,
-        "converged": null
+        "status": "pass",
+        "operations": 4,
+        "fault": "failed",
+        "converged": true,
+        "operations_by_type": {
+          "create": 2,
+          "update": 1,
+          "touch": 0,
+          "delete": 0,
+          "rename": 0,
+          "recreate": 1,
+          "noop": 0
+        },
+        "planned_puts": 4,
+        "planned_deletes": 0,
+        "put_attempts": 4
       },
       {
         "round": 18,
-        "status": "not_run_release_api_gap",
-        "operations": null,
-        "faults_injected": 0,
-        "converged": null
+        "status": "pass",
+        "operations": 4,
+        "fault": "none",
+        "converged": true,
+        "operations_by_type": {
+          "create": 0,
+          "update": 1,
+          "touch": 0,
+          "delete": 1,
+          "rename": 0,
+          "recreate": 0,
+          "noop": 2
+        },
+        "planned_puts": 1,
+        "planned_deletes": 1,
+        "put_attempts": 1
       },
       {
         "round": 19,
-        "status": "not_run_release_api_gap",
-        "operations": null,
-        "faults_injected": 0,
-        "converged": null
+        "status": "pass",
+        "operations": 4,
+        "fault": "none",
+        "converged": true,
+        "operations_by_type": {
+          "create": 0,
+          "update": 1,
+          "touch": 1,
+          "delete": 0,
+          "rename": 0,
+          "recreate": 1,
+          "noop": 1
+        },
+        "planned_puts": 2,
+        "planned_deletes": 0,
+        "put_attempts": 2
       },
       {
         "round": 20,
-        "status": "not_run_release_api_gap",
-        "operations": null,
-        "faults_injected": 0,
-        "converged": null
+        "status": "pass",
+        "operations": 4,
+        "fault": "none",
+        "converged": true,
+        "operations_by_type": {
+          "create": 0,
+          "update": 0,
+          "touch": 2,
+          "delete": 0,
+          "rename": 0,
+          "recreate": 0,
+          "noop": 2
+        },
+        "planned_puts": 0,
+        "planned_deletes": 0,
+        "put_attempts": 0
       },
       {
         "round": 21,
-        "status": "not_run_release_api_gap",
-        "operations": null,
-        "faults_injected": 0,
-        "converged": null
+        "status": "pass",
+        "operations": 4,
+        "fault": "none",
+        "converged": true,
+        "operations_by_type": {
+          "create": 0,
+          "update": 1,
+          "touch": 1,
+          "delete": 0,
+          "rename": 0,
+          "recreate": 0,
+          "noop": 2
+        },
+        "planned_puts": 1,
+        "planned_deletes": 0,
+        "put_attempts": 1
       },
       {
         "round": 22,
-        "status": "not_run_release_api_gap",
-        "operations": null,
-        "faults_injected": 0,
-        "converged": null
+        "status": "pass",
+        "operations": 4,
+        "fault": "none",
+        "converged": true,
+        "operations_by_type": {
+          "create": 0,
+          "update": 0,
+          "touch": 0,
+          "delete": 1,
+          "rename": 0,
+          "recreate": 0,
+          "noop": 3
+        },
+        "planned_puts": 0,
+        "planned_deletes": 1,
+        "put_attempts": 0
       },
       {
         "round": 23,
-        "status": "not_run_release_api_gap",
-        "operations": null,
-        "faults_injected": 0,
-        "converged": null
+        "status": "pass",
+        "operations": 4,
+        "fault": "none",
+        "converged": true,
+        "operations_by_type": {
+          "create": 0,
+          "update": 1,
+          "touch": 0,
+          "delete": 0,
+          "rename": 0,
+          "recreate": 1,
+          "noop": 2
+        },
+        "planned_puts": 2,
+        "planned_deletes": 0,
+        "put_attempts": 2
       },
       {
         "round": 24,
-        "status": "not_run_release_api_gap",
-        "operations": null,
-        "faults_injected": 0,
-        "converged": null
+        "status": "pass",
+        "operations": 4,
+        "fault": "none",
+        "converged": true,
+        "operations_by_type": {
+          "create": 0,
+          "update": 0,
+          "touch": 0,
+          "delete": 2,
+          "rename": 0,
+          "recreate": 0,
+          "noop": 2
+        },
+        "planned_puts": 0,
+        "planned_deletes": 2,
+        "put_attempts": 0
       },
       {
         "round": 25,
-        "status": "not_run_release_api_gap",
-        "operations": null,
-        "faults_injected": 0,
-        "converged": null
+        "status": "pass",
+        "operations": 4,
+        "fault": "none",
+        "converged": true,
+        "operations_by_type": {
+          "create": 1,
+          "update": 1,
+          "touch": 1,
+          "delete": 0,
+          "rename": 1,
+          "recreate": 0,
+          "noop": 0
+        },
+        "planned_puts": 3,
+        "planned_deletes": 1,
+        "put_attempts": 3
       },
       {
         "round": 26,
-        "status": "not_run_release_api_gap",
-        "operations": null,
-        "faults_injected": 0,
-        "converged": null
+        "status": "pass",
+        "operations": 4,
+        "fault": "none",
+        "converged": true,
+        "operations_by_type": {
+          "create": 0,
+          "update": 0,
+          "touch": 1,
+          "delete": 1,
+          "rename": 1,
+          "recreate": 0,
+          "noop": 1
+        },
+        "planned_puts": 1,
+        "planned_deletes": 2,
+        "put_attempts": 1
       },
       {
         "round": 27,
-        "status": "not_run_release_api_gap",
-        "operations": null,
-        "faults_injected": 0,
-        "converged": null
+        "status": "pass",
+        "operations": 4,
+        "fault": "none",
+        "converged": true,
+        "operations_by_type": {
+          "create": 1,
+          "update": 1,
+          "touch": 1,
+          "delete": 1,
+          "rename": 0,
+          "recreate": 0,
+          "noop": 0
+        },
+        "planned_puts": 2,
+        "planned_deletes": 1,
+        "put_attempts": 2
       },
       {
         "round": 28,
-        "status": "not_run_release_api_gap",
-        "operations": null,
-        "faults_injected": 0,
-        "converged": null
+        "status": "pass",
+        "operations": 4,
+        "fault": "none",
+        "converged": true,
+        "operations_by_type": {
+          "create": 0,
+          "update": 0,
+          "touch": 1,
+          "delete": 1,
+          "rename": 0,
+          "recreate": 1,
+          "noop": 1
+        },
+        "planned_puts": 1,
+        "planned_deletes": 1,
+        "put_attempts": 1
       },
       {
         "round": 29,
-        "status": "not_run_release_api_gap",
-        "operations": null,
-        "faults_injected": 0,
-        "converged": null
+        "status": "pass",
+        "operations": 4,
+        "fault": "none",
+        "converged": true,
+        "operations_by_type": {
+          "create": 1,
+          "update": 1,
+          "touch": 1,
+          "delete": 0,
+          "rename": 0,
+          "recreate": 0,
+          "noop": 1
+        },
+        "planned_puts": 2,
+        "planned_deletes": 0,
+        "put_attempts": 2
       },
       {
         "round": 30,
-        "status": "not_run_release_api_gap",
-        "operations": null,
-        "faults_injected": 0,
-        "converged": null
+        "status": "pass",
+        "operations": 4,
+        "fault": "none",
+        "converged": true,
+        "operations_by_type": {
+          "create": 0,
+          "update": 2,
+          "touch": 0,
+          "delete": 1,
+          "rename": 0,
+          "recreate": 1,
+          "noop": 0
+        },
+        "planned_puts": 3,
+        "planned_deletes": 1,
+        "put_attempts": 3
       }
     ]
   },
-  "reconciliation": [
-    {
-      "check": "key_sets",
-      "status": "not_run_release_api_gap"
-    },
-    {
-      "check": "sizes",
-      "status": "not_run_release_api_gap"
-    },
-    {
-      "check": "sha256",
-      "status": "not_run_release_api_gap"
-    },
-    {
-      "check": "etag_md5",
-      "status": "not_run_release_api_gap"
-    },
-    {
-      "check": "version_and_headers",
-      "status": "not_run_release_api_gap"
-    },
-    {
-      "check": "timestamp_interval",
-      "status": "not_run_release_api_gap"
-    },
-    {
-      "check": "round_revision_order",
-      "status": "not_run_release_api_gap"
-    },
-    {
-      "check": "model_vs_local",
-      "status": "not_run_release_api_gap"
-    }
-  ],
-  "observed_max_skew_seconds": null,
-  "listing_rebuild_verified": false
+  "reconciliation": {
+    "key_sets": "pass",
+    "sizes": "pass",
+    "sha256": "pass",
+    "etag_md5": "pass",
+    "version_headers": "pass",
+    "timestamps": "pass",
+    "revision_order": "pass",
+    "independent_model": "pass"
+  },
+  "observed_max_skew_seconds": 1.081,
+  "listing_rebuild_verified": true,
+  "zero_leftovers_verified": true,
+  "listing_import_requests": 102,
+  "rebuilt_plan_requests": 0,
+  "bucket_absent": true,
+  "request_counts": {
+    "CreateBucket": 1,
+    "DeleteBucket": 1,
+    "DeleteObjects": 18,
+    "GetBucketTagging": 390,
+    "HeadObject": 736,
+    "ListObjectsV2": 38,
+    "PutBucketTagging": 1,
+    "PutObject": 248
+  },
+  "request_attempts": 1433,
+  "estimated_cost_usd": 0.0018854,
+  "cap_usd": 0.05,
+  "live": true,
+  "put_correlation_audit": {
+    "status": "pass",
+    "expected_distinct_put_operations": 244,
+    "put_attempts": 248,
+    "conditional_412_attempts": 1,
+    "documented_uncertain_retries": 3,
+    "unexpected_confirmed_reuploads": 0,
+    "touch_puts": 0,
+    "failed_local_upload_receipts": 1,
+    "crash_generation_puts": 100,
+    "rounds": [
+      {
+        "round": 1,
+        "status": "pass",
+        "planned_puts": 1,
+        "put_attempts": 1,
+        "touch_puts": 0,
+        "unexpected_reuploads": 0
+      },
+      {
+        "round": 2,
+        "status": "pass",
+        "planned_puts": 1,
+        "put_attempts": 1,
+        "touch_puts": 0,
+        "unexpected_reuploads": 0
+      },
+      {
+        "round": 3,
+        "status": "pass",
+        "planned_puts": 2,
+        "put_attempts": 2,
+        "touch_puts": 0,
+        "unexpected_reuploads": 0
+      },
+      {
+        "round": 4,
+        "status": "pass",
+        "planned_puts": 2,
+        "put_attempts": 2,
+        "touch_puts": 0,
+        "unexpected_reuploads": 0
+      },
+      {
+        "round": 5,
+        "status": "pass",
+        "planned_puts": 1,
+        "put_attempts": 2,
+        "touch_puts": 0,
+        "unexpected_reuploads": 0
+      },
+      {
+        "round": 6,
+        "status": "pass",
+        "planned_puts": 1,
+        "put_attempts": 1,
+        "touch_puts": 0,
+        "unexpected_reuploads": 0
+      },
+      {
+        "round": 7,
+        "status": "pass",
+        "planned_puts": 1,
+        "put_attempts": 1,
+        "touch_puts": 0,
+        "unexpected_reuploads": 0
+      },
+      {
+        "round": 8,
+        "status": "pass",
+        "planned_puts": 0,
+        "put_attempts": 0,
+        "touch_puts": 0,
+        "unexpected_reuploads": 0
+      },
+      {
+        "round": 9,
+        "status": "pass",
+        "planned_puts": 0,
+        "put_attempts": 0,
+        "touch_puts": 0,
+        "unexpected_reuploads": 0
+      },
+      {
+        "round": 10,
+        "status": "pass",
+        "planned_puts": 0,
+        "put_attempts": 0,
+        "touch_puts": 0,
+        "unexpected_reuploads": 0
+      },
+      {
+        "round": 11,
+        "status": "pass",
+        "planned_puts": 2,
+        "put_attempts": 3,
+        "touch_puts": 0,
+        "unexpected_reuploads": 0
+      },
+      {
+        "round": 12,
+        "status": "pass",
+        "planned_puts": 0,
+        "put_attempts": 0,
+        "touch_puts": 0,
+        "unexpected_reuploads": 0
+      },
+      {
+        "round": 13,
+        "status": "pass",
+        "planned_puts": 1,
+        "put_attempts": 1,
+        "touch_puts": 0,
+        "unexpected_reuploads": 0
+      },
+      {
+        "round": 14,
+        "status": "pass",
+        "planned_puts": 0,
+        "put_attempts": 0,
+        "touch_puts": 0,
+        "unexpected_reuploads": 0
+      },
+      {
+        "round": 15,
+        "status": "pass",
+        "planned_puts": 2,
+        "put_attempts": 2,
+        "touch_puts": 0,
+        "unexpected_reuploads": 0
+      },
+      {
+        "round": 16,
+        "status": "pass",
+        "planned_puts": 2,
+        "put_attempts": 2,
+        "touch_puts": 0,
+        "unexpected_reuploads": 0
+      },
+      {
+        "round": 17,
+        "status": "pass",
+        "planned_puts": 4,
+        "put_attempts": 4,
+        "touch_puts": 0,
+        "unexpected_reuploads": 0
+      },
+      {
+        "round": 18,
+        "status": "pass",
+        "planned_puts": 1,
+        "put_attempts": 1,
+        "touch_puts": 0,
+        "unexpected_reuploads": 0
+      },
+      {
+        "round": 19,
+        "status": "pass",
+        "planned_puts": 2,
+        "put_attempts": 2,
+        "touch_puts": 0,
+        "unexpected_reuploads": 0
+      },
+      {
+        "round": 20,
+        "status": "pass",
+        "planned_puts": 0,
+        "put_attempts": 0,
+        "touch_puts": 0,
+        "unexpected_reuploads": 0
+      },
+      {
+        "round": 21,
+        "status": "pass",
+        "planned_puts": 1,
+        "put_attempts": 1,
+        "touch_puts": 0,
+        "unexpected_reuploads": 0
+      },
+      {
+        "round": 22,
+        "status": "pass",
+        "planned_puts": 0,
+        "put_attempts": 0,
+        "touch_puts": 0,
+        "unexpected_reuploads": 0
+      },
+      {
+        "round": 23,
+        "status": "pass",
+        "planned_puts": 2,
+        "put_attempts": 2,
+        "touch_puts": 0,
+        "unexpected_reuploads": 0
+      },
+      {
+        "round": 24,
+        "status": "pass",
+        "planned_puts": 0,
+        "put_attempts": 0,
+        "touch_puts": 0,
+        "unexpected_reuploads": 0
+      },
+      {
+        "round": 25,
+        "status": "pass",
+        "planned_puts": 3,
+        "put_attempts": 3,
+        "touch_puts": 0,
+        "unexpected_reuploads": 0
+      },
+      {
+        "round": 26,
+        "status": "pass",
+        "planned_puts": 1,
+        "put_attempts": 1,
+        "touch_puts": 0,
+        "unexpected_reuploads": 0
+      },
+      {
+        "round": 27,
+        "status": "pass",
+        "planned_puts": 2,
+        "put_attempts": 2,
+        "touch_puts": 0,
+        "unexpected_reuploads": 0
+      },
+      {
+        "round": 28,
+        "status": "pass",
+        "planned_puts": 1,
+        "put_attempts": 1,
+        "touch_puts": 0,
+        "unexpected_reuploads": 0
+      },
+      {
+        "round": 29,
+        "status": "pass",
+        "planned_puts": 2,
+        "put_attempts": 2,
+        "touch_puts": 0,
+        "unexpected_reuploads": 0
+      },
+      {
+        "round": 30,
+        "status": "pass",
+        "planned_puts": 3,
+        "put_attempts": 3,
+        "touch_puts": 0,
+        "unexpected_reuploads": 0
+      }
+    ]
+  },
+  "runtime": {
+    "lmaws": "0.1.23",
+    "lmfiles": "0.1.2",
+    "region": "us-east-1",
+    "profile": "lmaws"
+  },
+  "driver_commit": "2cfa9b8",
+  "cost_scope": "Conservative API request-attempt estimate; tiny transient storage/transfer not separately metered.",
+  "verification_schedule": "Full LIST+HEAD after scripted phases, at final reconciliation and import; soak rounds use fresh LIST plus changed-object HEADs.",
+  "fresh_local_files_rechecked": true,
+  "reconciliation_key_count": 99,
+  "reconciliation_timestamp_intervals": 99,
+  "resources": {
+    "buckets_created": 1,
+    "buckets_deleted": 1,
+    "objects_in_final_reconciliation": 99,
+    "objects_deleted_at_teardown": 99,
+    "leftover_objects": 0,
+    "leftover_buckets": 0
+  },
+  "absence_proof": {
+    "fresh_executor": true,
+    "exists": false,
+    "http_status": 404,
+    "error_code": "NoSuchBucket"
+  },
+  "fault_semantics": {
+    "lost_response": "successful SDK response discarded before application confirmation",
+    "kill": "SDK executor SIGKILL at controlled receipt boundary; reattach/replay before replan",
+    "failed_upload": "LocalChecksumMismatch before dispatch; no PUT transmission"
+  },
+  "denials_observed": 0,
+  "remote_only_import_recheck": {
+    "status": "pass",
+    "source": "verified_s3_snapshot_only",
+    "imported_keys": 99,
+    "normal_plan_operations": 0,
+    "aws_requests": 0,
+    "original_client_times_reconstructed": false
+  }
 }

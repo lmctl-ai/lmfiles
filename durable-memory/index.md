@@ -15,8 +15,8 @@
 - [../docs/SCAN.md](../docs/SCAN.md): optional incremental local ingestion and failure semantics.
 
 - [../docs/measurements-1c-a.json](../docs/measurements-1c-a.json): historical storage and local functional pairing evidence (no new measurements planned).
-- [../docs/S3_100_TEST.md](../docs/S3_100_TEST.md): authorized100-object live test plus seeded soak/reconciliation, blocked at the released-host API preflight.
-- [../docs/S3_100_RESULTS.json](../docs/S3_100_RESULTS.json): sanitized counts/status; no AWS session or resources created.
+- [../docs/S3_100_TEST.md](../docs/S3_100_TEST.md): completed authorized100-object live test, seeded soak, reconciliation and zero-leftover proof.
+- [../docs/S3_100_RESULTS.json](../docs/S3_100_RESULTS.json): sanitized completed live counts/status/skew/cost; raw IDs stay private.
 
 - [../docs/LOCAL_SCALE_TEST.md](../docs/LOCAL_SCALE_TEST.md): explicitly authorized local guarded correctness ramp, independent of S3.
 

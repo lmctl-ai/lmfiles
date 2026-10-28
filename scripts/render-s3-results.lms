@@ -1,0 +1,9 @@
+# Local rendering of sanitized completed live evidence; no AWS calls.
+let report=read_json("docs/S3_100_RESULTS.json");assert(report.status=="pass"&&report.zero_leftovers_verified);
+let DATA="";for(name in ["create","update","touch","delete","rename","recreate","noop"]){DATA=DATA+name+" "+str(report.soak.operations_by_type[name])+"\n";}
+let TITLE="Live S3 correctness: 30 seeded rounds\n3 injected faults converged; zero leftovers verified";
+let p=_lmcode_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+plot.png("docs/images/s3_live.png",960,560);plot.data("OPS",${DATA});
+plot.cmd(${"set title '"+TITLE+"';set ylabel 'Local tree operations';set yrange [0:55];set grid ytics;set style data histograms;set style fill solid 0.8;set boxwidth 0.7;plot $OPS using 2:xtic(1) lc rgb '#2563eb' notitle"});plot.close();
+end _lmcode_
+mkdir("build");savedsl(p,"build/s3-results-plot.dslb");let r=system(concat(dsl_cli(p),["--dsl","build/s3-results-plot.dslb"]),60000);assert(r.code==0);

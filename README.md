@@ -135,14 +135,15 @@ and 1C scope are in [durable-memory/index.md](durable-memory/index.md).
 MIT, Copyright 2026 Lattice Systems LLC. H2 is redistributed under MPL 2.0;
 see [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES) and embedded `--notices`.
 
-The authorized100-object live S3 correctness test is [blocked by released lmaws
-0.1.22 API gaps](docs/S3_100_TEST.md). Its safe capability preflight opens no AWS
-session and exits2/BLOCKED: `AWS_PROFILE=lmaws lmctl https://raw.githubusercontent.com/lmctl-ai/lmfiles/main/examples/upload_s3_100_preflight.lms syntheticrun01`.
-No bucket or object was created; independent remote absence is not claimed.
+![Completed live S3 correctness campaign](docs/images/s3_live.png)
 
-That same blocked test now specifies30 reproducible soak rounds (seed20261027),
-three-way file/registry/S3 reconciliation and listing-import recovery. The local
-independent oracle is tested; no live soak round or reconciliation has run.
+The [live S3 pairing](docs/S3_100_TEST.md) passed:100 initial objects,30 seeded
+rounds, three injected faults, three-way reconciliation, explicit listing-import
+rebuild and independently verified zero leftovers. The persistent ledger recorded
+1,433 request attempts and an estimated request cost of **$0.0018854** in
+us-east-1. Prices and credential configuration may vary; the script cap stays$0.05.
+Run only with an explicitly authorized sandbox profile and a unique run ID:
+`AWS_PROFILE=lmaws lmctl https://raw.githubusercontent.com/lmctl-ai/lmfiles/main/examples/upload_s3_live.lms --live uniquesyntheticrun01`
 
 The separately authorized [guarded local index/get/update correctness run](docs/LOCAL_SCALE_TEST.md)
 passed through20M items, with mandatory cleanup verified. Maintenance headroom

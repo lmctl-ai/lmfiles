@@ -8,3 +8,6 @@ for name in frontier revisions claims snapshots journal_resume publish_ttl downl
   timeout 180 lmscript "$ROOT/examples/$name.lms"
   cp "images/$name.png" "$ROOT/docs/images/$name.png"
 done
+
+# Re-render committed sanitized live evidence; never rerun cloud work for a picture.
+(cd "$ROOT"; timeout 120 lmscript scripts/render-s3-results.lms)

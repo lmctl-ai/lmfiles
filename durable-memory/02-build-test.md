@@ -22,10 +22,10 @@ CI: https://github.com/lmctl-ai/lmfiles/actions/runs/40526639317 . New evidence 
 Linux only; do not imply new macOS/Windows qualification. Measurements in docs.
 
 S3 capability preflight: scripts/test-s3-preflight.py runs10 local checks against
-the pinned installed lmaws0.1.22 schema/version, never executing AWS DSL.
-Use that binary on PATH. Exit2/BLOCKED is expected; all10 live phases remain NOT RUN.
+the pinned installed lmaws0.1.23 schema/version, never executing AWS DSL.
+Use that binary on PATH. READY means signatures only; preflight never opens an AWS session. The separate live driver completed all10 phases.
 
-The gate runs9 pure s3-correctness-oracle unit tests. They test the model and
+The gate runs10 pure s3-correctness-oracle unit tests. They test the model and
 comparison logic only, not S3 transport or live convergence. No scale study.
 
 The separately authorized local ramp uses scripts/test-scale.py with fixed40GB
@@ -37,3 +37,8 @@ Completed local campaign:1M/5M/20M core correctness passed; all DB files removed
 Maintenance safely admitted compaction through5M and format upgrade through1M.
 Scale harness captured archive9a3fba0; test-only atomic fixture fixfd45ed5 has
 114 storage assertions and native/managed gates. No on-disk format change.
+
+Live helper tests:9; PUT correlation-audit tests:4. Full SDK loopback driver passed
+30 rounds before live execution. New API examples pin lmaws0.1.23 and use a Linux
+process/cleanup supervisor. The live result and raw-private/public split are
+documented in docs/S3_100_TEST.md. Render sanitized chart with scripts/render-s3-results.lms.

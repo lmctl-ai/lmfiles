@@ -3,7 +3,7 @@ if(env("LMFILES_S3_SUPERVISED","")!="1"){
  assert(ARGV.len()==2&&ARGV[0]=="--live","Usage: AWS_PROFILE=lmaws lmctl <this URL>.lms --live <unique synthetic run id>");
  assert(env("AWS_PROFILE","")=="lmaws","AWS_PROFILE must be lmaws");
  let BOOT=abs_path(".lmfiles-local/s3-live-bootstrap");mkdir(BOOT+"/scripts");mkdir(BOOT+"/examples");
- for(name in ["test-s3-live.py","s3-live-oracle.py","s3_correctness_oracle.py"]){assert(write_file(BOOT+"/scripts/"+name,http_get("https://raw.githubusercontent.com/lmctl-ai/lmfiles/main/scripts/"+name)));}
+ for(name in ["test-s3-live.py","s3-live-oracle.py","s3_correctness_oracle.py","s3-live-ledger-audit.py"]){assert(write_file(BOOT+"/scripts/"+name,http_get("https://raw.githubusercontent.com/lmctl-ai/lmfiles/main/scripts/"+name)));}
  assert(write_file(BOOT+"/examples/upload_s3_live.lms",http_get("https://raw.githubusercontent.com/lmctl-ai/lmfiles/main/examples/upload_s3_live.lms")));
  let launched=system(["python3",BOOT+"/scripts/test-s3-live.py","--live","--run-id",ARGV[1]],4200000);
  assert(launched.code==0,"S3 job failed; supervisor retained private evidence and attempted cleanup");exit(0);
@@ -165,7 +165,13 @@ end _lmcode_
  write_json(ROOT+"/local.json",local);write_json(ROOT+"/registry.json",current);write_json(ROOT+"/remote.json",remote);write_json(ROOT+"/history.json",STATE.history);
  helper(["verify",abs_path(".")]);let check=read_json(ROOT+"/verify-report.json");assert(check.ok,"three-way mismatch; private key/view/round diagnostic retained");STATE.max_skew=max(STATE.max_skew,check.observed_max_skew_seconds);check.heads=names.len();check.full=full;return check;
 }
-fn job(round,fault,kill_after){let plan=plan_job(round);let before=ledger();let confirmed=execute(plan,fault,kill_after);let after=ledger();return {plan:plan,confirmed:confirmed,puts:puts(after)-puts(before)};}
+fn job(round,fault,kill_after){let plan=plan_job(round);
+ if(starts_with(read_json(ROOT+"/manifest.json").mode,"soak-")){
+  let expected=read_json(ROOT+"/operations.json").last_round.plan;let actual={adds:[],changed:[],deletes:[]};
+  for(op in plan.operations){let field=op.verb=="delete"?"deletes":(op.kind=="add"?"adds":"changed");actual[field]=concat(actual[field],[op.key]);}
+  assert(json_stringify(actual.adds)==json_stringify(expected.adds)&&json_stringify(actual.changed)==json_stringify(expected.changed)&&json_stringify(actual.deletes)==json_stringify(expected.deletes),"plan disagrees with independent round model; no SDK execution");
+ }
+ let before=ledger();let confirmed=execute(plan,fault,kill_after);let after=ledger();return {plan:plan,confirmed:confirmed,puts:puts(after)-puts(before)};}
 fn teardown(){
  if(!file_exists(ROOT+"/create.json")){let summary=ledger();assert(summary.attempts==0,"creation outcome unconfirmed; no unsafe bucket adoption; operator review required");return;}
  let creation=read_json(ROOT+"/create.json");assert(creation.get("created",false),"cleanup refuses a bucket not created by this test");
@@ -194,8 +200,31 @@ end _lmcode_
  let summary=ledger();let report=file_exists(ROOT+"/public-results.json")?read_json(ROOT+"/public-results.json"):{status:"failed_before_completion",progress:file_exists(ROOT+"/progress.json")?read_json(ROOT+"/progress.json"):null};report.zero_leftovers_verified=true;if(report.status=="pass_before_teardown"){report.status="pass";report.phases=concat(report.phases,[{phase:"teardown",status:"pass"}]);}report.bucket_absent=true;report.request_counts={};for(op in keys(summary.by_operation)){report.request_counts[op]=summary.by_operation[op].requests;}report.request_attempts=summary.attempts;report.estimated_cost_usd=summary.estimated_cost_usd;report.cap_usd=summary.cap_usd;write_json(ROOT+"/public-results.json",report);
  println("zero leftovers verified; estimated cost: $"+str(summary.estimated_cost_usd));
 }
+fn rebuild_snapshot(){
+ STATE.catalog={};if(file_exists(DB)){remove_file(DB);}if(file_exists(DB+".lock")){remove_file(DB+".lock");}write_file(PLAN,"");write_file(RESULTS,"");
+ helper(["import",abs_path(".")]);let entries=read_json(ROOT+"/import-rows.json").rows;
+ for(entry in entries){let IDENTITY=json_stringify({id:entry.key});let FIELDS=json_stringify(entry.fields);
+ let import_item=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
+let db=registry.open(${DB},"s3-live","{}");file_write(${ROOT+"/import-item.json"},db.item_upsert(${IDENTITY},${FIELDS}));db.close();
+end _lmcode_
+ ensure(native(import_item,"import-item"));let item=read_json(ROOT+"/import-item.json");STATE.catalog[entry.key]=item.item;
+ let IMPORT=json_stringify({stage:"published",namespace:BUCKET,status:"ok",source_revision:item.revision,source_fingerprint:entry.fingerprint,metadata:entry.metadata});
+ let import_record=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
+let db=registry.open(${DB},"s3-live","{}");db.stage_record(${item.item},${IMPORT});db.close();
+end _lmcode_
+ ensure(native(import_record,"import-record"));
+ }
+ write_json(ROOT+"/catalog.json",STATE.catalog);
+}
+if(MODE=="import-check"){
+ let before=ledger();rebuild_snapshot();let planned=plan_job(40);let after=ledger();
+ assert(planned.operations.len()==0&&after.attempts==before.attempts,"remote-only import did not produce a zero-request empty plan");
+ let imported=registry_view();let remote=read_json(ROOT+"/remote.json");assert(keys(imported).len()==keys(remote).len());
+ for(key in keys(remote)){assert(imported[key].sha256==remote[key].metadata.sha256&&imported[key].size==remote[key].size&&imported[key].etag==remote[key].etag,"remote-derived import differs");}
+ write_json(ROOT+"/import-proof.json",{status:"pass",source:"verified_s3_snapshot_only",imported_keys:keys(imported).len(),normal_plan_operations:0,aws_requests:0,original_client_times_reconstructed:false});exit(0);
+}
 if(MODE=="cleanup"){teardown();exit(0);}
-assert(MODE=="run");
+assert(MODE=="run");println("Live correctness seed=20261027; rounds=30; object PUT cap=400");
 let probe=_lmcode_ cli="lmaws" install="github:lmctl-ai/lmaws@v0.1.23";
 check(true);
 end _lmcode_
@@ -224,29 +253,17 @@ ensure(native(conditional,"conditional"));let condition=read_json(ROOT+"/conditi
 checkpoint(phase_rows,soak_rows);
 let operation_counts={create:0,update:0,touch:0,delete:0,rename:0,recreate:0,noop:0};let faults=0;
 for(n in range(1,num(env("LMFILES_S3_ROUNDS","30"))+1)){
- helper(["mutate",abs_path("."),"soak-"+str(n)]);let operations=read_json(ROOT+"/operations.json").last_round.operations;for(op in operations){operation_counts[op.applied]=operation_counts[op.applied]+1;}
+ helper(["mutate",abs_path("."),"soak-"+str(n)]);let operations=read_json(ROOT+"/operations.json").last_round.operations;let round_counts={create:0,update:0,touch:0,delete:0,rename:0,recreate:0,noop:0};for(op in operations){operation_counts[op.applied]=operation_counts[op.applied]+1;round_counts[op.applied]=round_counts[op.applied]+1;}
  let fault=n==5?"kill":(n==11?"lost":(n==17?"failed":"none"));let outcome=job(n+10,fault,fault=="kill"?1:0);
  if(fault!="none"){faults=faults+1;let remaining=plan_job(n+10);assert(remaining.operations.len()>0 ||fault=="kill");execute(remaining,"none",0);}
- let converged=plan_job(n+10);assert(converged.operations.len()==0,"round did not converge");let checked=verify(n+10,false);soak_rows=concat(soak_rows,[{round:n,status:"pass",operations:read_json(ROOT+"/operations.json").last_round.operations.len(),fault:fault,converged:true}]);
+ let converged=plan_job(n+10);assert(converged.operations.len()==0,"round did not converge");let checked=verify(n+10,false);soak_rows=concat(soak_rows,[{round:n,status:"pass",operations:read_json(ROOT+"/operations.json").last_round.operations.len(),operations_by_type:round_counts,planned_puts:outcome.plan.adds+outcome.plan.changed,planned_deletes:outcome.plan.deletes,fault:fault,converged:true}]);
 checkpoint(phase_rows,soak_rows);
  println("soak round "+str(n)+" converged");
 }
 let final=verify(40,true);write_json(ROOT+"/public-results.json",{status:"pass_before_teardown",host_version:"0.1.23",phases:concat(phase_rows,[{phase:"seeded_soak",status:"pass"},{phase:"three_way_reconciliation",status:"pass"}]),soak:{seed:20261027,rounds:soak_rows.len(),operations_by_type:operation_counts,faults_injected:faults,converged:true,rounds_summary:soak_rows},reconciliation:{key_sets:"pass",sizes:"pass",sha256:"pass",etag_md5:"pass",version_headers:"pass",timestamps:"pass",revision_order:"pass",independent_model:"pass"},observed_max_skew_seconds:STATE.max_skew,listing_rebuild_verified:false,zero_leftovers_verified:false});
 # Explicit listing import follows after final reconciliation; never infer upload history from listing.
 let import_before=ledger();verify(40,true);let import_after=ledger();assert(import_after.attempts>import_before.attempts);
-let old_catalog=STATE.catalog;remove_file(DB);if(file_exists(DB+".lock")){remove_file(DB+".lock");}STATE.catalog={};write_file(PLAN,"");write_file(RESULTS,"");
-let remote=read_json(ROOT+"/remote.json");let entries=read_json(ROOT+"/manifest.json").entries;
-for(entry in entries){let h=remote[entry.key];let IDENTITY=json_stringify({id:entry.key});let FIELDS=json_stringify({content_hash:entry.sha256,size:str(entry.size)});
- let import_item=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
-let db=registry.open(${DB},"s3-live","{}");file_write(${ROOT+"/import-item.json"},db.item_upsert(${IDENTITY},${FIELDS}));db.close();
-end _lmcode_
- ensure(native(import_item,"import-item"));let item=read_json(ROOT+"/import-item.json");STATE.catalog[entry.key]=item.item;
- let IMPORT=json_stringify({stage:"published",namespace:BUCKET,status:"ok",source_revision:item.revision,source_fingerprint:{hash:entry.sha256,size:str(entry.size)},metadata:{present:true,key:entry.key,size:entry.size,sha256:entry.sha256,etag:h.etag,version:h.version,round:40,remote_last_modified:h.last_modified,provenance:"explicit_s3_listing_head",original_upload_times:null}});
- let import_record=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
-let db=registry.open(${DB},"s3-live","{}");db.stage_record(${item.item},${IMPORT});db.close();
-end _lmcode_
- ensure(native(import_record,"import-record"));
-}
+rebuild_snapshot();let remote=read_json(ROOT+"/remote.json");
 write_json(ROOT+"/catalog.json",STATE.catalog);let rebuild_before=ledger();let rebuilt=plan_job(40);let rebuild_after=ledger();assert(rebuilt.operations.len()==0&&rebuild_after.attempts==rebuild_before.attempts);let report=read_json(ROOT+"/public-results.json");let imported=registry_view();assert(keys(imported).len()==keys(remote).len());for(key in keys(remote)){assert(imported[key].sha256==remote[key].metadata.sha256&&imported[key].etag==remote[key].etag&&imported[key].size==remote[key].size,"rebuild mismatch");}
 report.listing_rebuild_verified=true;report.phases=concat(report.phases,[{phase:"listing_rebuild",status:"pass"}]);report.listing_import_requests=import_after.attempts-import_before.attempts;report.rebuilt_plan_requests=0;write_json(ROOT+"/public-results.json",report);
 # Supervisor invokes this same file in cleanup mode, including on any failure.

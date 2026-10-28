@@ -15,7 +15,7 @@ from pathlib import Path
 import tempfile
 from typing import Any
 
-from s3_correctness_oracle import Model, SEED, fingerprint, reconcile, soak_plan, UNIVERSE
+from s3_correctness_oracle import Model, SEED, fingerprint, reconcile, remote_sha, timestamp_ms, soak_plan, UNIVERSE
 
 STATE_NAME = ".lmfiles-local/s3-live"
 CONTENT_TYPE = "text/plain"
@@ -47,7 +47,8 @@ def key_body(key: str, generation: int) -> bytes:
 
 def manifest_for(root: Path, tree: Path, round_number: int) -> list[dict]:
     entries = []
-    for file in sorted(tree.glob("synthetic-*.txt")):
+    for file in sorted(tree.iterdir()):
+        if file.is_symlink() or not file.is_file():raise ValueError("non-regular file in private desired tree")
         body = file.read_bytes()
         key = file.name
         fp = fingerprint(body)
@@ -173,16 +174,54 @@ def _load_view(path: Path) -> dict:
     return value
 
 
+def import_remote(root: Path) -> dict:
+    """Convert only the independently captured remote listing into import rows."""
+    work = state_dir(root)
+    remote = _load_view(work / "remote.json")
+    rows = []
+    for key in sorted(remote):
+        source = remote[key]
+        if not isinstance(source, dict):
+            raise ValueError(f"remote row {key!r} is not an object")
+        digest = remote_sha(source)
+        size = source.get("size")
+        if type(size) is not int or not 0 <= size <= 16 * 1024 * 1024:
+            raise ValueError(f"remote row {key!r} has invalid size")
+        etag = str(source.get("etag", "")).strip('"')
+        if not etag:
+            raise ValueError(f"remote row {key!r} has empty etag")
+        timestamp_ms(source.get("last_modified"))
+        rows.append({"key": key, "fields": {"content_hash": digest, "size": str(size)},
+                     "fingerprint": {"hash": digest, "size": str(size)},
+                     "metadata": {"present": True, "key": key, "size": size,
+                                  "sha256": digest, "etag": source["etag"], "version": source.get("version"),
+                                  "remote_last_modified": source["last_modified"],
+                                  "content_type": source.get("content_type"),
+                                  "cache_control": source.get("cache_control"),
+                                  "provenance": "explicit_s3_listing_head",
+                                  "original_upload_times": None, "round": None}})
+    result = {"rows": rows, "count": len(rows), "source": "remote.json"}
+    atomic_json(work / "import-rows.json", result)
+    return result
+
+
 def verify(root: Path) -> dict:
     work = state_dir(root)
     expected_doc = json.loads((work / "modelexpected.json").read_text(encoding="utf-8"))
-    local = _load_view(work / "local.json")
+    reported_local = _load_view(work / "local.json")
+    fresh_entries=manifest_for(root,work/"tree",expected_doc["round"])
+    local={e["key"]:{field:e[field] for field in ("size","sha256","md5","content_type","cache_control")} for e in fresh_entries}
     registry = _load_view(work / "registry.json")
     remote = _load_view(work / "remote.json")
     history_path = work / "history.json"
     manifest = json.loads((work / "manifest.json").read_text(encoding="utf-8"))
     manifest_map = {row["key"]: row for row in manifest["entries"]}
     model_errors = []
+    for key in sorted(set(local)^set(reported_local)):
+        model_errors.append({"key":key,"view":"actual_files_vs_snapshot","field":"key_set"})
+    for key in sorted(set(local)&set(reported_local)):
+        for field in ("size","sha256","md5"):
+            if local[key][field]!=reported_local[key].get(field):model_errors.append({"key":key,"view":"actual_files_vs_snapshot","field":field})
     for key in sorted(set(manifest_map) ^ set(expected_doc["expected"])):
         model_errors.append({"key": key, "view": "manifest_vs_model", "field": "key_set"})
     for key in sorted(set(manifest_map) & set(expected_doc["expected"])):
@@ -193,7 +232,7 @@ def verify(root: Path) -> dict:
     result = reconcile(local, registry, remote, history=history, expected=expected_doc["expected"],
                        origins={key: row.get("round") for key, row in expected_doc["expected"].items()})
     report = {"ok": bool(result.get("ok")) and not model_errors, "mode": manifest["mode"],
-              "round": expected_doc["round"], "mismatch_count": len(result.get("mismatches", [])),
+              "round": expected_doc["round"], "mismatch_count": len(model_errors)+len(result.get("mismatches", [])),
               "observed_max_skew_seconds": result.get("observed_max_skew_seconds"),
               "valid_intervals": result.get("valid_intervals", 0),
               "mismatches": model_errors + result.get("mismatches", [])}
@@ -203,11 +242,11 @@ def verify(root: Path) -> dict:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(); sub = ap.add_subparsers(dest="action", required=True)
-    for action in ("prepare", "verify"):
+    for action in ("prepare", "verify", "import"):
         p = sub.add_parser(action); p.add_argument("root", type=Path)
     p = sub.add_parser("mutate"); p.add_argument("root", type=Path); p.add_argument("mode")
     ns = ap.parse_args(argv)
-    result = prepare(ns.root) if ns.action == "prepare" else mutate(ns.root, ns.mode) if ns.action == "mutate" else verify(ns.root)
+    result = prepare(ns.root) if ns.action == "prepare" else mutate(ns.root, ns.mode) if ns.action == "mutate" else verify(ns.root) if ns.action == "verify" else import_remote(ns.root)
     print(json.dumps(result, sort_keys=True)); return 0 if result.get("ok", True) else 1
 
 

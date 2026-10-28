@@ -56,6 +56,8 @@ def main():
     assert os.environ.get('AWS_PROFILE')=='lmaws','AWS_PROFILE must be lmaws'
     assert args.live or args.fixture_endpoint,'explicit --live authorization switch required'
     assert 1<=args.rounds<=30
+    if args.live:assert args.rounds==30,'authorized live campaign requires30 rounds'
+    os.umask(0o077)
     work=(args.work_dir or REPO/'.lmfiles-local'/('live-'+args.run_id)).resolve()
     work.mkdir(parents=True,exist_ok=True)
     root=work/'.lmfiles-local/s3-live';assert not root.exists(),'fresh private work directory required'
@@ -98,6 +100,11 @@ def main():
     if summary.exists():
         report=json.loads(summary.read_text())
         report['live']=args.fixture_endpoint is None
+        if status==0 and args.rounds==30:
+            with (work/'put-audit.log').open('w') as out:
+                audited=subprocess.run(['python3',str(REPO/'scripts/s3-live-ledger-audit.py'),'--work',str(work)],stdout=out,stderr=subprocess.STDOUT,timeout=30)
+            if audited.returncode:status=1
+            else:report['put_correlation_audit']=json.loads((root/'audit-public.json').read_text())
         if status==0 and not (report.get('status')=='pass' and report.get('zero_leftovers_verified') is True and report.get('listing_rebuild_verified') is True):status=1
         if status!=0:report['status']='failed'
         summary.write_text(json.dumps(report,indent=2)+'\n')

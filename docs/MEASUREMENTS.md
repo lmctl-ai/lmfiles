@@ -133,6 +133,6 @@ remote, workflow dispatch, tag or release was run for1C-a.
 
 Performance and scale measurement are not planned; correctness is the bar. No100M
 qualification or large-upload campaign is a goal. The separately authorized
-100-object live upload correctness test is blocked before AWS by the released
-lmaws0.1.22 API: [status and missing capabilities](S3_100_TEST.md). Existing10k
+100-object live upload correctness test passed with released lmaws0.1.23:
+[phases, counts and zero-leftover proof](S3_100_TEST.md). Existing10k
 figures above and the historical JSON are informational only.

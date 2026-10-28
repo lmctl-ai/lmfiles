@@ -55,28 +55,76 @@ loopback S3 service, including30 rounds, all fault types, import and cleanup.
 It passed with248 PUT attempts and1433 total reservations. These are fixture
 counts, not published live results. Nanosecond Java Instant input exposed a
 Python3.10 oracle parsing bug; normalization and a regression case fix it.
-The local gates pass; the authorized live run is next.
+The authorized live run completed successfully. Results below are live evidence,
+not fixture counts; no further live execution is part of this report.
 
-## Phase disposition
+## Completed live phases
 
-| Phase | Status | Required assertion when unblocked |
+| Phase | Live result | Evidence |
 |---|---|---|
-| First publish | PENDING LIVE |100 adds, confirmed receipts, independent verification |
-| No-change | PENDING LIVE | Empty plan; zero AWS requests, including ownership/credential probes |
-| Change/add/delete | PENDING LIVE |3 changed uploads +2 adds +2 deletes |
-| Kill/resume | PENDING LIVE | Only unconfirmed work replanned;100 PUTs plus at most1 in-flight retry |
-| Uncertain/412 | PENDING LIVE | Ambiguous result unconfirmed;412 never overwrites existing content |
-| Seeded soak | PENDING LIVE |30 rounds, seed20261027, all7 operation types, fault/recovery checks |
-| Three-way reconciliation | PENDING LIVE | S3 listing/metadata, registry belief and actual local files agree |
-| Listing-import rebuild | PENDING LIVE | Lose DB; explicitly import verified remote state; next plan empty |
-| Independent verification | PENDING LIVE | Exact key set, sizes, hashes/ETags, Content-Type and Cache-Control |
-| Teardown/absence | PENDING LIVE | Delete owned objects/bucket and independently prove absence |
+| First publish | PASS |100 adds; all100 independently listed/HEAD-verified |
+| No-change | PASS | Empty plan;0 ledger requests; no cloud session/attach/HEAD/LIST |
+| Change/add/delete | PASS | Exactly3 changes +2 adds +2 deletes;100 objects verified |
+| Kill/resume | PASS |40 durable receipts replayed;60 replanned;100 PUTs total |
+| Uncertain result | PASS | Dropped application response remained unconfirmed;1 item replanned |
+| Conditional412 | PASS | Different attempted bytes refused; existing object independently unchanged |
+| Seeded soak | PASS |30 rounds,120 operations,3 faults; every round converged |
+| Final reconciliation | PASS |99 final keys match files/registry/S3; checksums/headers/times agree |
+| Listing import | PASS | Explicit listing/HEAD import; next plan empty with0 requests |
+| Teardown | PASS |99 objects deleted, bucket deleted, fresh executor404 NoSuchBucket |
 
-Historical0.1.22 preflight: created resources=0, AWS requests=0, estimated cost=$0.00. This is a preflight
-safety result, **not an independent remote absence proof** and not a successful
-live upload test. Sanitized evidence: [S3_100_RESULTS.json](S3_100_RESULTS.json).
-The roughly$0.002 intended live estimate remains unmeasured. No test upload, tag,
-release or workflow dispatch is performed by this capability check.
+Seed **20261027**. Actual operation totals: create7, update16, touch20, delete16,
+rename7, re-create8, no-op46. Faults: kill in round5, application response loss in
+round11, local failed-upload refusal in round17. Convergence:30/30. Per-round
+counts/status/faults and the separate PUT correlation audit are in
+[S3_100_RESULTS.json](S3_100_RESULTS.json). Maximum observed interval skew:
+**1.081 seconds**, within300 seconds.
+
+The full final check and the explicit import fetch independently HEADed all99
+present objects. No-change intentionally performs no remote verification inside
+its zero-request job; its preceding/following mutation phases are independently
+verified. During soak, fresh listings plus changed-object HEADs preserve the
+bounded request cost; final reconciliation re-HEADs every object.
+
+Persistent ledger summary (API request attempts):
+
+| Operation | Requests |
+|---|---:|
+| CreateBucket | 1 |
+| DeleteBucket | 1 |
+| DeleteObjects | 18 |
+| GetBucketTagging | 390 |
+| HeadObject | 736 |
+| ListObjectsV2 | 38 |
+| PutBucketTagging | 1 |
+| PutObject | 248 |
+
+Total **1,433**; estimated request cost **$0.0018854**, cap **$0.05**. Tiny transient
+storage/transfer is not separately metered. No cap raise or IAM/admin operation.
+One exact sandbox bucket was created/deleted using only profile lmaws in us-east-1.
+No denial or registry/host correctness bug was observed. Atomic DeleteBucket
+success plus a fresh-process NoSuchBucket/404 proves no visible or hidden-version
+resource remains in that bucket. No request/account IDs or ARNs are public.
+
+The independent PUT audit reconstructs the planned correlation IDs from the
+fixture/model and reads the SDK ledger locally:244 distinct planned uploads,
+248 PUT attempts =244 +3 documented uncertain retries +1 conditional412. It
+checks the distribution per operation ID, not merely a matching total. There were
+**0 touch PUTs**, **0 unexpected confirmed reuploads**, and exactly100 PUTs for
+the crash generation. Local upload-checksum refusal produced1 error receipt and
+no additional PUT transmission. Four negative unit cases reject unexpected IDs,
+wrong duplicate distribution, missing checksum evidence and foreign buckets.
+
+Oracle issues were fixed with regressions: Python3.10 Java-Instant nanosecond
+parsing, and verification trusting an older manifest rather than rehashing the
+actual tree. A post-run fresh-file check against the saved pre-teardown registry/
+S3 snapshot verified all99 keys and timestamps with0 mismatches. The remote-import helper was also made independent of local manifest values;
+it now validates and imports only the saved S3 checksum/size/ETag metadata. A
+remote-only import recheck of the same99-key snapshot again produced an empty
+plan with0 AWS requests. No second S3 fetch or bucket was created for these local
+proof checks. The SDK and registry product behavior did not need a patch. Live driver commit:2cfa9b8;
+subsequent proof/checker changes are recorded in Git. No second bucket or live
+rerun was needed for those local rechecks.
 
 Correctness is the bar. Existing10k storage figures remain historical information;
 performance and scale measurement,100M qualification and large uploads are not
@@ -138,16 +186,16 @@ ETag/MD5 equivalence is not claimed for multipart/SSE-KMS objects. If the host
 cannot supply the required compatible PUT/checksum metadata, stop as a capability
 limitation rather than weakening the assertion.
 
-| Check | Required comparison | Current live result |
+| Check | Required comparison | Completed live result |
 |---|---|---|
-| Key sets | Actual local tree = confirmed registry presence = S3 keys; confirmed deletes leave no believed presence | NOT RUN |
-| Size | Local byte length = recorded size = S3 size | NOT RUN |
-| SHA256 | Local digest = recorded digest = S3 full-object ChecksumSHA256, or explicit `sha256` object metadata | NOT RUN |
-| ETag | Single-part ETag = local MD5 = recorded ETag | NOT RUN |
-| Version/headers | Remote version matches receipt; Content-Type and Cache-Control match script policy | NOT RUN |
-| Time interval | S3 LastModified within recorded request start..confirmation, allowing at most300s skew | NOT RUN |
-| Time ordering | Server times nondecreasing across serial rounds and per-item successful revisions; whole-second ties allowed | NOT RUN |
-| Independent model | Actual local key set/bytes match the in-memory expected tree | NOT RUN |
+| Key sets | Actual local tree = confirmed registry presence = S3 keys; confirmed deletes leave no believed presence | PASS |
+| Size | Local byte length = recorded size = S3 size | PASS |
+| SHA256 | Local digest = recorded digest = S3 full-object ChecksumSHA256, or explicit `sha256` object metadata | PASS |
+| ETag | Single-part ETag = local MD5 = recorded ETag | PASS |
+| Version/headers | Remote version matches receipt; Content-Type and Cache-Control match script policy | PASS |
+| Time interval | S3 LastModified within recorded request start..confirmation, allowing at most300s skew | PASS |
+| Time ordering | Server times nondecreasing across serial rounds and per-item successful revisions; whole-second ties allowed | PASS |
+| Independent model | Actual local key set/bytes match the in-memory expected tree | PASS |
 
 Additional SHA256 checksums are canonical Base64 full-object32-byte SHA256; do not
 compare a multipart/composite checksum to a local full-object hash. If both an
@@ -169,7 +217,7 @@ not just the final object snapshot. Private mismatch diagnostics contain synthet
 key, disagreeing view/field and originating round from the independent model
 (including deletion origins; pass its origin map to the checker), or explicit
 unknown for an unowned/extra key with no source event. Public results retain only
-counts/pass-fail and observed max skew (currently null, not an invented zero).
+counts/pass-fail and observed max skew (1.081 seconds in the completed run).
 
 ## Explicit listing-import recovery
 
@@ -203,9 +251,48 @@ normal LMScript driver must supply independently acquired views; this helper is
 not an S3 executor or an implemented live driver. `scripts/test-s3-oracle.py`
 checks reproducibility, all operation types, touch/rename/recreate rules, request
 admission, missing/extra keys, stale deletion beliefs, hashes, metadata fallback,
-ETag/version/headers, unconfirmed beliefs, timestamps and ordering. Nine local
-unit tests pass; they do not imply any live round converged.
+ETag/version/headers, unconfirmed beliefs, timestamps and ordering. The local oracle/model tests are distinct from the completed live evidence above.
 
 The preflight still publishes only NOT RUN summaries and never executes AWS.
-The full loopback driver passed all phases. Live results will replace the
-historical blocked report only after the authorized run and independent teardown.
+The live results above come from the separately authorized full driver, followed
+by independent teardown and local correlation/fresh-file proof checks.
+
+
+## Live soak by round
+
+Counts below are local-tree operations, not SDK requests. PUT attempts include
+only that round's uploads/retries; DELETE and ownership/verification requests are
+in the cumulative ledger table. Every round converged before the next mutation.
+
+| Round | Create | Update | Touch | Delete | Rename | Recreate | No-op | PUT attempts | Fault | Converged |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
+| 1 | 0 | 1 | 0 | 2 | 0 | 0 | 1 | 1 | none | yes |
+| 2 | 0 | 1 | 2 | 0 | 0 | 0 | 1 | 1 | none | yes |
+| 3 | 0 | 0 | 1 | 0 | 2 | 0 | 1 | 2 | none | yes |
+| 4 | 1 | 0 | 0 | 0 | 0 | 1 | 2 | 2 | none | yes |
+| 5 | 0 | 1 | 0 | 1 | 0 | 0 | 2 | 2 | kill | yes |
+| 6 | 0 | 0 | 1 | 0 | 1 | 0 | 2 | 1 | none | yes |
+| 7 | 1 | 0 | 1 | 0 | 0 | 0 | 2 | 1 | none | yes |
+| 8 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | none | yes |
+| 9 | 0 | 0 | 1 | 0 | 0 | 0 | 3 | 0 | none | yes |
+| 10 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | none | yes |
+| 11 | 0 | 2 | 2 | 0 | 0 | 0 | 0 | 3 | lost | yes |
+| 12 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | none | yes |
+| 13 | 0 | 1 | 2 | 0 | 0 | 0 | 1 | 1 | none | yes |
+| 14 | 0 | 0 | 0 | 3 | 0 | 0 | 1 | 0 | none | yes |
+| 15 | 0 | 0 | 0 | 1 | 1 | 1 | 1 | 2 | none | yes |
+| 16 | 0 | 0 | 1 | 1 | 1 | 1 | 0 | 2 | none | yes |
+| 17 | 2 | 1 | 0 | 0 | 0 | 1 | 0 | 4 | failed | yes |
+| 18 | 0 | 1 | 0 | 1 | 0 | 0 | 2 | 1 | none | yes |
+| 19 | 0 | 1 | 1 | 0 | 0 | 1 | 1 | 2 | none | yes |
+| 20 | 0 | 0 | 2 | 0 | 0 | 0 | 2 | 0 | none | yes |
+| 21 | 0 | 1 | 1 | 0 | 0 | 0 | 2 | 1 | none | yes |
+| 22 | 0 | 0 | 0 | 1 | 0 | 0 | 3 | 0 | none | yes |
+| 23 | 0 | 1 | 0 | 0 | 0 | 1 | 2 | 2 | none | yes |
+| 24 | 0 | 0 | 0 | 2 | 0 | 0 | 2 | 0 | none | yes |
+| 25 | 1 | 1 | 1 | 0 | 1 | 0 | 0 | 3 | none | yes |
+| 26 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 1 | none | yes |
+| 27 | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 2 | none | yes |
+| 28 | 0 | 0 | 1 | 1 | 0 | 1 | 1 | 1 | none | yes |
+| 29 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 2 | none | yes |
+| 30 | 0 | 2 | 0 | 1 | 0 | 1 | 0 | 3 | none | yes |
