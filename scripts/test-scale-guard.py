@@ -20,6 +20,26 @@ spec.loader.exec_module(scale)
 
 
 class ScaleGuardTests(unittest.TestCase):
+    def test_deadline_mid_phase_is_incomplete_and_cleans(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td); work=Path(tempfile.mkdtemp(prefix="lmfiles-scale-")); report=root/'report.json'
+            worker=root/'worker.py'; worker.write_text('import time; time.sleep(30)')
+            ns=type('Args',(),{'steps':[100], 'timeout':5, 'progress_log':None, 'budget':.05})()
+            with redirect_stdout(StringIO()):
+                self.assertEqual(scale.campaign(ns,[sys.executable,str(worker)],report,work),0)
+            result=json.loads(report.read_text())
+            self.assertEqual(result['state'],'budget_stopped')
+            self.assertEqual(result['phases'][-1]['state'],'budget_stopped')
+            self.assertTrue(result['cleanup_verified'])
+            self.assertFalse(any(p.get('status')=='ok' for p in result['phases']))
+
+    def test_reports_cannot_write_outside_fixture_on_e(self):
+        for flag in ('--report','--progress-log'):
+            with self.subTest(flag=flag), redirect_stdout(StringIO()), mock.patch('sys.stderr',new=StringIO()):
+                with self.assertRaises(SystemExit) as exc:
+                    scale.main([flag,'/mnt/e/forbidden-output.json','--steps','100'])
+                self.assertEqual(exc.exception.code,2)
+
     def test_e_campaign_executes_only_volume_phases_and_cleans(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td); work=Path(tempfile.mkdtemp(prefix="lmfiles-scale-")); report=root/'report.json'

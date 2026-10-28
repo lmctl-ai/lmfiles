@@ -48,4 +48,4 @@ subset/frontier/claim/reopen in a fresh dedicated directory. Fixed guards500GB
 free/150GB fixture plus40GB root free; default wall budget1h, maximum6h. Next-step
 admission uses prior elapsed time with25% margin. All fixtures removed. 9p/DrvFS
 is unsupported for durability; crash/lock/fsync/compaction/upgrade tests stay on
-Linux ext4. See docs/DRVFS_LIMITATIONS.md.23 safety unit tests in each gate.
+Linux ext4. See docs/DRVFS_LIMITATIONS.md.25 safety unit tests in each gate.

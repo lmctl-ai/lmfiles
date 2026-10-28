@@ -39,3 +39,25 @@ whose durability-sensitive exclusion tests remain on ext4. SIGKILL here kills a
 Python JSONL writer only, not a registry or the Windows host. This explicit probe
 is the sole small mount characterization exception; registry crash/compaction/
 upgrade tests never run on E:.
+
+## Completed volume-only run
+
+The one-hour ramp completed all five phases at **1,000,000 items**, then returned
+`budget_stopped` before attempting10M. The next step projected3,690.6seconds with
+25% margin, exceeding the remaining3,304.8seconds. No50M/100M attempt was made.
+The dedicated directory was removed and its absence independently checked.
+[DRVFS_VOLUME_RESULTS.json](DRVFS_VOLUME_RESULTS.json) contains exact counts.
+
+| Operation | Correctness result | Seconds (informational) |
+|---|---|---:|
+| Bulk index |1M items,2M aliases,4,999,000 events |255.76 |
+| Identity/alias/subset verify |10,009 samples;1,000 pending, exact membership |7.10 |
+| Update |10,000 new revisions; all failed-after-success projections retained |23.30 |
+| Claim/complete |128 completed; duplicate completions fenced |1.30 |
+| Reopen and verify |10,009 samples;4,186 pending, exact membership |7.17 |
+
+Final exact counts:1M items,2M aliases,5,055,804 events,0 active claims.
+Minimum observed E: free2,847.64GB; peak fixture0.926GB (limits500GB/150GB).
+End-of-step physical DB925.7bytes/item is informational only. The managed JVM
+performed the large step; a native1,000-item volume smoke also passed. No registry
+mismatch was found. These statements confer no crash/durability qualification.

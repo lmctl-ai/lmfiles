@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import signal
 import sys
 import time
 import uuid
@@ -25,6 +26,9 @@ def main() -> int:
     if not ROOT.is_dir():
         print(json.dumps({"status": "unavailable", "reason": "/mnt/e is not mounted"}))
         return 0
+    def interrupted(_signum, _frame):
+        raise KeyboardInterrupt
+    previous_handlers = {sig: signal.signal(sig, interrupted) for sig in (signal.SIGINT, signal.SIGTERM)}
     run_id = uuid.uuid4().hex[:12]
     work = ROOT / f"lmfiles-scale-probe-{run_id}"
     result: dict[str, object] = {"mount": "/mnt/e", "work": "dedicated", "status": "pass"}
@@ -130,6 +134,8 @@ def main() -> int:
         if not recoverable:
             result["status"] = "limited"
     finally:
+        for sig, handler in previous_handlers.items():
+            signal.signal(sig, handler)
         # The path is uniquely generated and never follows links.
         if work.exists() and not work.is_symlink():
             for child in work.iterdir():

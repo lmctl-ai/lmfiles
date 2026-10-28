@@ -279,6 +279,9 @@ def main(argv: Iterable[str] | None = None) -> int:
         ap.error("--command must be a non-empty JSON string array")
     command = resolve_command(command, Path.cwd())
     report = ns.report.resolve()
+    for output in (report, ns.progress_log.resolve() if ns.progress_log else None):
+        if output is not None and (output == Path("/mnt/e") or Path("/mnt/e") in output.parents):
+            ap.error("reports/logs must stay on Linux; E: is reserved for the dedicated fixture")
     report.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="lmfiles-scale-", dir="/mnt/e" if ns.volume == "e" else "/tmp") as directory:
         return campaign(ns, command, report, Path(directory))

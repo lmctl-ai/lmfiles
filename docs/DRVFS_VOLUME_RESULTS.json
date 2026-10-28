@@ -1,0 +1,173 @@
+{
+  "state": "budget_stopped",
+  "scope": "Local synthetic correctness; timings and sizes informational only",
+  "volume": "e",
+  "budget_seconds": 3600.0,
+  "next_count": 10000000,
+  "projected_next_seconds": 3690.6245217625838,
+  "guards": {
+    "minimum_volume_free_bytes": 500000000000,
+    "minimum_root_free_bytes": 40000000000,
+    "maximum_registry_bytes": 150000000000,
+    "readings": 609,
+    "minimum_volume_free_observed": 2847640268800,
+    "minimum_root_free_observed": null,
+    "maximum_registry_observed": 925659136
+  },
+  "cleanup_verified": true,
+  "directory_independently_absent": true,
+  "largest_indexed": 1000000,
+  "largest_compacted": 0,
+  "largest_upgraded": 0,
+  "steps": [
+    {
+      "items_requested": 1000000,
+      "operations": [
+        {
+          "operation": "build",
+          "status": "ok",
+          "seconds_informational": 255.763257747,
+          "exact_counts": {
+            "aliases": "2000000",
+            "claims": "0",
+            "events": "4999000",
+            "examined": "0",
+            "items": "1000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "db_bytes": 804839424,
+          "bytes_per_item_informational": 804.839424,
+          "guard": {
+            "samples": 509,
+            "free_before": 2848565932032,
+            "free_after": 2847761088512,
+            "minimum_free": 2847761088512,
+            "maximum_directory": 804839587
+          },
+          "items_added": 1000000,
+          "items_per_second_informational": 3909.8657438481487
+        },
+        {
+          "operation": "verify",
+          "status": "ok",
+          "seconds_informational": 7.097708756,
+          "exact_counts": {
+            "aliases": "2000000",
+            "claims": "0",
+            "events": "4999000",
+            "examined": "0",
+            "items": "1000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "samples": 10009,
+          "subset_rows": 10009,
+          "frontier_rows": 1000,
+          "db_bytes": 804839424,
+          "bytes_per_item_informational": 804.839424,
+          "guard": {
+            "samples": 16,
+            "free_before": 2847761088512,
+            "free_after": 2847761088512,
+            "minimum_free": 2847761088512,
+            "maximum_directory": 804839587
+          }
+        },
+        {
+          "operation": "update",
+          "status": "ok",
+          "seconds_informational": 23.30005717,
+          "exact_counts": {
+            "aliases": "2000000",
+            "claims": "0",
+            "events": "5055676",
+            "examined": "0",
+            "items": "1000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "updated": 10000,
+          "failed_after_success_verified": 10000,
+          "db_bytes": 922660864,
+          "bytes_per_item_informational": 922.660864,
+          "guard": {
+            "samples": 48,
+            "free_before": 2847761088512,
+            "free_after": 2847643267072,
+            "minimum_free": 2847643267072,
+            "maximum_directory": 922661036
+          },
+          "updates_per_second_informational": 429.18349629096645
+        },
+        {
+          "operation": "claim",
+          "status": "ok",
+          "seconds_informational": 1.295447117,
+          "exact_counts": {
+            "aliases": "2000000",
+            "claims": "0",
+            "events": "5055804",
+            "examined": "0",
+            "items": "1000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "claimed_and_completed": 128,
+          "db_bytes": 925655040,
+          "bytes_per_item_informational": 925.65504,
+          "guard": {
+            "samples": 4,
+            "free_before": 2847643267072,
+            "free_after": 2847640268800,
+            "minimum_free": 2847640268800,
+            "maximum_directory": 925659136
+          }
+        },
+        {
+          "operation": "reopen",
+          "status": "ok",
+          "seconds_informational": 7.17049184,
+          "exact_counts": {
+            "aliases": "2000000",
+            "claims": "0",
+            "events": "5055804",
+            "examined": "0",
+            "items": "1000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "samples": 10009,
+          "subset_rows": 10009,
+          "frontier_rows": 4186,
+          "db_bytes": 925655040,
+          "bytes_per_item_informational": 925.65504,
+          "guard": {
+            "samples": 16,
+            "free_before": 2847640268800,
+            "free_after": 2847640268800,
+            "minimum_free": 2847640268800,
+            "maximum_directory": 925659136
+          }
+        }
+      ]
+    }
+  ],
+  "aws_requests": 0,
+  "admin_commands": 0,
+  "tag_or_release_created": false,
+  "provenance": {
+    "implementation_commit": "c2e25a5",
+    "worker_sha256": "35e87706d4d482db763b23dd5d9f8fc22b5a4e1279cdf1d3d4311fcdc4d6375b",
+    "worker_runtime": "managed OpenJDK21",
+    "native_smoke_items": 1000
+  },
+  "durability_supported": false,
+  "planned_ramp": [
+    1000000,
+    10000000,
+    50000000,
+    100000000
+  ],
+  "mount_probe": "DRVFS_PROBE_RESULTS.json"
+}

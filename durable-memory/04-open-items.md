@@ -43,3 +43,7 @@ See docs/LOCAL_SCALE_RESULTS.json for exact counts and code/archive provenance.
 The E: follow-up is an explicitly bounded local correctness campaign, not a scale
 qualification roadmap. Volume operations only on9p/DrvFS; all durability tests
 stay on Linux ext4. No additional live/cloud run is authorized.
+
+E: follow-up completed1M core volume checks, then stopped before10M on projected
+one-hour budget; temporary directory removed.9p rename probe observed a missing
+destination, so durability remains unsupported. See docs/DRVFS_LIMITATIONS.md.
