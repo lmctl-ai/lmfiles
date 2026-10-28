@@ -1,10 +1,10 @@
-# Local qualification
+# Historical local measurements
 
 Measured 2026-10-27, Linux x64/glibc2.35, GraalVM Community25.0.2+10.1.
 Code: `45d4324578903b15d19f28b330d06859d22d05da`; subsequent Windows text/path
 fixes do not change store behavior. Machine-readable [evidence](measurements.json).
-These are single local observations, not 100M qualification, p95 statistics or an
-OS-cache-flushed benchmark. The benchmark ran alongside the native gate.
+These are single local observations retained for regression context. They are not
+scale, throughput, latency or large-upload qualification.
 
 | Measurement | Observed |
 |---|---:|
@@ -14,20 +14,15 @@ OS-cache-flushed benchmark. The benchmark ran alongside the native gate.
 | Events | 60,100 (six/item plus100 stage-forget updates) |
 | Final physical store file | 15,073,280 B |
 | Physical bytes/item, including retained pages | **1,507.328 B** |
-| Build/update time | 4.090 s |
 | Pending frontier | 100 items |
 | Frontier entries examined | **100**, not all10,000 stage rows |
-| Reopened frontier query | **3.711 ms** |
-| 1,000 permuted subset lookups with JSON serialization | **73.083 ms** |
-| Benchmark peak RSS (time -v) | 72,684 KiB |
 | Linux native executable | 28,510,472 B (~27.2MiB) |
 | Dynamic NEEDED entries | libc.so.6 only |
 
 Native SHA256:
 `248badcb03eb194f4c200e2490d4fd4c0fb035aaaf273e4ecf77f7cefcff0e75`.
-Reproduce in an empty DB path: `lmfiles --benchmark /tmp/new-fixture.mv 10000`.
-The fixture generator rejects existing DBs. Different timestamp/compression/page
-retention histories can change bytes/item; no compressed-store bound is promised.
+Different timestamp/compression/page retention histories can change bytes/item; no
+compressed-store bound is promised.
 
 ## Gate results
 
@@ -58,17 +53,14 @@ the locally built unreleased binary on PATH.
 
 ## Interpretation and 1C
 
-The design's750–1,050 B/item lean estimate is **not met by this first codec**.
 The measured implementation uses dense long item keys, interned stage IDs,
 co-located CRC32C-protected compressed JSON byte rows and normal MVStore pages.
 It retains explicit audit metadata and timestamps rather than a custom packed
 raw-digest/event codec. This is a measured small-tier implementation, not a
 reason to silently drop history or claim the theoretical target.
 
-1C must measure compact binary metadata/raw-digest encoding, prefix/delta layouts,
-metadata-heavy profiles, compaction amplification and100M local items under fixed
-memory. Optional scans, general indexed predicates/change cursors/event archives
-and multi-process coordination also remain1C. Existing transport-host gaps remain
+Optional scans are now implemented. General indexed predicates/change cursors/
+event archives and multi-process coordination remain possible future API work. Existing transport-host gaps remain
 separate; no real AWS/SFTP test is performed or authorized here.
 
 ## Five-platform qualification
@@ -97,9 +89,8 @@ fresh **uncompacted physical files**, including normal MVStore retained pages.
 Both have10,000 items,60,100 events and100 pending items; the frontier examines
 exactly100 entries. No audit records or metadata were dropped. Alias kind/namespace
 interning and self-success elision provide a modest physical reduction because
-existing compression already deduplicated much of the repeated data. This does
-not meet the750–1,050B target or qualify100M scale. Timestamp/page-compression
-variance means one run is not a statistical throughput comparison.
+existing compression already deduplicated much of the repeated data. These are
+historical storage observations, not a scale or performance qualification.
 
 Format2 migration/backup/rollback behavior is in [FORMAT_UPGRADE.md](FORMAT_UPGRADE.md),
 and clock/fencing behavior in [LEASES.md](LEASES.md). The patch's Linux gates add
@@ -122,37 +113,26 @@ Files are fresh/uncompacted; no events, aliases or user metadata are removed.
 | Saved | 6,758,400 | 675.84 (45.6558%) |
 
 The profile has10,000 items,60,100 events,40,000 aliases,five stages/item and100
-pending items. The frontier examines100 records. Compact binary event headers
-plus canonical raw metadata let MVStore compress repeated fields across pages,
-instead of Deflating each event separately. The750–1,050B target is met for this
-small fixture. It is not a100M/heavy-profile qualification. Single-run latencies
-are noisy: before/after frontier2.587/2.746ms and1,000 subset queries39.549/88.903ms;
-no throughput improvement is claimed from those timings. Earlier exploratory
-format3 measurement was800.3584B/item; page/timestamp variation is expected.
+pending items. The frontier examines100 records. Compact binary event headers and
+canonical metadata are retained as historical storage evidence; no scale or
+throughput claim is made from this fixture.
 
-An isolated native100k-file scan hashes100,000 files in10.507s (9,517files/s).
-No-op rescan:1.517s (65,920files/s),zero hashes. This includes local stat/traversal,
-registry reads and any batched commits; fixture creation is excluded. Both full
-managed/native gates also exercise100k scans (29 assertions each), alongside63
-core,17 journal,23 lease,22 review and111 storage assertions:265 total per runtime.
-Each runs21 subprocess checks/12 fault points, DSL and CLI scan bindings, memory
-limits, signatures and gallery validation. Native also passes the6GiB virtual
-address-space check. No new macOS/Windows execution is claimed.
-
-Real pairings pass against checksum-verified released Linux assets lmcurl0.1.2 and
-lmssh0.1.1 with the native registry:12 HTTP checks,11 SFTP checks and12 pipeline
-checks. HTTP verifies actual304, exact validators,404 suppression, timeout and
-disconnect receipts/failure counts. SFTP kills the **public job** while upload and
-download files are incomplete, confirms no success projection for the interrupted
-stage, resumes the same job with reput/reget, verifies bytes and proves no-op
-reruns/strict host-key refusal. No remote listing or remote checksum command is
-used. The pipeline injects effect-before-receipt failures at fetched, cleaned and
-published stages, then replays and converges. New pictures are generated from
-these local runs. Original gallery files/captions are validated by the gate; the
-optional legacy render-all campaign is not claimed as rerun here.
+Prior functional pairings passed against released lmcurl0.1.2 and lmssh0.1.1:
+12 HTTP,11 SFTP and12 pipeline checks, all local fixtures with synthetic bytes.
+These are functional results, not performance claims. No real cloud or real remote
+was used in1C-a. Historical measurement JSON remains unchanged; no new measurement
+is planned.
 
 Format1/2 upgrades retain backups; an additional native upgrade of the real
 released-code10k format2 DB preserved item/event counts, the prior reader reads
 the backup, and refuses format3. See FORMAT_UPGRADE.md. Core remains network-free;
 all transport tests use loopback and synthetic data. No AWS/admin command, real
 remote, workflow dispatch, tag or release was run for1C-a.
+
+## Current acceptance rule
+
+Performance and scale measurement are not planned; correctness is the bar. No100M
+qualification or large-upload campaign is a goal. The separately authorized
+100-object live upload correctness test is blocked before AWS by the released
+lmaws0.1.22 API: [status and missing capabilities](S3_100_TEST.md). Existing10k
+figures above and the historical JSON are informational only.

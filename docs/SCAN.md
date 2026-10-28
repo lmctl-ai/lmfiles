@@ -39,6 +39,6 @@ or revision change. Results contain files, changed, hashed, bytes, elapsed_ms an
 root; counters are decimal strings. They describe the visited subset, not an
 implicit inventory of the entire tree.
 
-The managed/native gate creates 100,000 synthetic small files, tests no-op hash
-reuse, revisions, algorithm changes, root separation, sharding, symlinks, missing
-files and failure recovery. See MEASUREMENTS.md for timings and limits.
+The managed/native gate checks no-op hash reuse, revisions, algorithm changes,
+root separation, sharding, symlinks, missing files and failure recovery. The
+gate is a correctness check; it does not claim a scale or throughput tier.

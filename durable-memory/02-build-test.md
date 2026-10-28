@@ -7,15 +7,20 @@ address space4GiB/maxheap3GiB; address-space/memory tests are in test.sh.
 
 Managed: copy scripts/lmfiles-managed to target/bin/lmfiles. Run test.sh, build
 native, then test.sh --native. Each Linux gate runs63 core,17 journal,23 lease,
-22 review,111 storage and29 scan assertions (100k files), DSL/CLI scan bindings,
+22 review,111 storage and29 scan correctness assertions (1,000 synthetic files;
+no timing/throughput output), DSL/CLI scan bindings,
 21 subprocess checks/12 fault points, schema/notices, memory and gallery checks.
 Native additionally repeats core under a6GiB virtual-address limit.
 
-Local real-product gates: scripts/test-pairings.py (12 HTTP checks), test-sftp.py
-(11 Linux checks including killed reput/reget), test-pipeline.py (12 checks).
-Require hosts on PATH; Python3 and private system sshd for SFTP. No cloud.
+Local-fixture checks: scripts/test-pairings.py, test-sftp.py and test-pipeline.py.
+They require hosts on PATH; Python3 and a private system sshd for SFTP. No cloud
+or real remote is used, and these checks are not performance qualifications.
 
-0.1.0 and0.1.1 released; main0.1.2 awaits Lead release. CI is manual dispatch only;
-no dispatch, tag or release by the1C-a implementer. Historical five-platform0.1.0
+0.1.0,0.1.1 and0.1.2 are released. This follow-up adds correctness tests/docs. CI is manual dispatch only;
+no dispatch, tag or release by the implementer. Historical five-platform0.1.0
 CI: https://github.com/lmctl-ai/lmfiles/actions/runs/40526639317 . New evidence is
 Linux only; do not imply new macOS/Windows qualification. Measurements in docs.
+
+S3 capability preflight: scripts/test-s3-preflight.py runs8 local checks against
+the pinned installed lmaws0.1.22 schema/version, never executing AWS DSL.
+Use that binary on PATH. Exit2/BLOCKED is expected; all7 live phases remain NOT RUN.

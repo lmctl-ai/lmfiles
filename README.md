@@ -19,19 +19,20 @@ executor. Confirmed journal receipts advance each user-defined stage. Rerun afte
 `fail-fetch`, `fail-clean` or `fail-publish` to recover the confirmation gap.
 `lmctl https://raw.githubusercontent.com/lmctl-ai/lmfiles/main/examples/pipeline_lifecycle.lms`
 
-| Real HTTP download manager | Registry-driven SFTP upload and download |
+| Local HTTP fixture download manager | Registry-driven local SFTP fixture |
 |---|---|
 | ![Conditional HTTP receipts](docs/images/download_lmcurl.png) | ![Strict local SFTP transfers](docs/images/sftp_registry.png) |
-| A URL list, recorded validators, real 304, gone suppression and failure receipts against a private loopback server. Requires Python 3. `lmctl https://raw.githubusercontent.com/lmctl-ai/lmfiles/main/examples/download_lmcurl.lms` | Strict host keys, temporary names, resumable SFTP and no remote listing; starts a throwaway local sshd. Requires Linux, Python 3, ssh-keygen and an installed sshd. `lmctl https://raw.githubusercontent.com/lmctl-ai/lmfiles/main/examples/sftp_registry.lms` |
+| A URL list, recorded validators, 304, gone suppression and failure receipts against a synthetic loopback fixture. Requires Python 3. `lmctl https://raw.githubusercontent.com/lmctl-ai/lmfiles/main/examples/download_lmcurl.lms` | Strict host keys, temporary names, resumable SFTP and no remote listing against a throwaway local fixture. Requires Linux, Python 3, ssh-keygen and an installed sshd. `lmctl https://raw.githubusercontent.com/lmctl-ai/lmfiles/main/examples/sftp_registry.lms` |
 
 ## Build and run
 
-Versions **0.1.0 and 0.1.1 are released**. Current main targets **0.1.2**;
-the implementer does not tag or release it. README pairings use existing released
-APIs and install every host from `github:lmctl-ai/<name>@latest`. The new scan
-method requires a local main build until the Lead releases 0.1.2. All inputs and
-pictures are synthetic. Real HTTP and SFTP examples restrict connections to local
-fixtures; the upload executor remains a local fake.
+Versions **0.1.0 through0.1.2 are released**. This follow-up changes functional
+tests and documentation; it does not tag or release. README pairings use existing
+released APIs and install each host from `github:lmctl-ai/<name>@latest`.
+All inputs and pictures are synthetic; transfer examples remain local fixtures and the upload
+executor remains a local fake. The acceptance bar is deterministic correctness,
+not a large-tree or upload-performance tier. Performance and scale measurement
+are not planned; correctness is the bar.
 
 Opening a format 1/2 DB with main upgrades it to format 3 with a retained backup.
 Read [the upgrade/rollback contract](docs/FORMAT_UPGRADE.md). There is no reset or
@@ -117,15 +118,15 @@ aliases can be represented as tagged Base64 bytes; unsupported local-path I/O is
 rejected. A transfer completed before any durable result remains unconfirmed and
 may be repeated. See [docs/JOURNAL.md](docs/JOURNAL.md).
 
-The format-3 10,000-item profile measures **804.45 bytes/item**, within the design's
-750–1,050 target for that fixture (format 2: 1,480.29). This is not a 100M
-qualification. Measured workloads and crash
-results are recorded in [docs/MEASUREMENTS.md](docs/MEASUREMENTS.md).
+The format-3 10,000-item profile measures **804.45 bytes/item** (format 2:
+1,480.29). These are historical informational measurements for one fixture, not a
+scale, throughput or large-upload qualification. Crash results are recorded in
+[docs/MEASUREMENTS.md](docs/MEASUREMENTS.md).
 
 ## Development
 
 `test.sh` is the gate. CI is **workflow_dispatch only**, has no cloud credentials,
-and does not tag/release. `examples/render-all.sh` regenerates the nine gallery images. The real local pairing checks are
+and does not tag/release. `examples/render-all.sh` regenerates the nine gallery images. The local-fixture pairing checks are
 `scripts/test-pairings.py`, `scripts/test-sftp.py` and `scripts/test-pipeline.py`;
 run them with all hosts on PATH. Each supports `--gallery`.
 The original design and review live in the sibling lmaws repo; implementation notes
@@ -133,3 +134,8 @@ and 1C scope are in [durable-memory/index.md](durable-memory/index.md).
 
 MIT, Copyright 2026 Lattice Systems LLC. H2 is redistributed under MPL 2.0;
 see [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES) and embedded `--notices`.
+
+The authorized100-object live S3 correctness test is [blocked by released lmaws
+0.1.22 API gaps](docs/S3_100_TEST.md). Its safe capability preflight opens no AWS
+session and exits2/BLOCKED: `AWS_PROFILE=lmaws lmctl https://raw.githubusercontent.com/lmctl-ai/lmfiles/main/examples/upload_s3_100_preflight.lms syntheticrun01`.
+No bucket or object was created; independent remote absence is not claimed.

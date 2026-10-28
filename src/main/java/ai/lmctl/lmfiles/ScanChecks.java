@@ -3,11 +3,11 @@ package ai.lmctl.lmfiles;
 import java.nio.file.*;
 import java.util.*;
 
-/** Deterministic local-only scan checks, including the 100k-file scale shape. */
+/** Deterministic local-only scan checks, using small synthetic trees. */
 public final class ScanChecks {
   private ScanChecks() {}
   private static int n;
-  private static long firstElapsed, noopElapsed, firstHashed, noopHashed;
+  private static final int FILES=1000;
   private static void ok(boolean value, String message) { if (!value) throw new AssertionError(message); n++; }
   private static Map<String,Object> obj(String json) { return J.obj(json); }
   private static void reject(Runnable run, String message) { try { run.run(); throw new AssertionError(message); } catch (IllegalArgumentException|IllegalStateException e) { n++; } }
@@ -23,22 +23,19 @@ public final class ScanChecks {
     n = 0; Files.createDirectories(root);
     Path tree = root.resolve("tree"); Path db = root.resolve("scan.mv");
     Files.createDirectories(tree.resolve("a")); Files.createDirectories(tree.resolve("b"));
-    for (int i = 0; i < 100_000; i++) {
+    for (int i = 0; i < FILES; i++) {
       Path file = (i & 1) == 0 ? tree.resolve("a").resolve("f-" + i + ".txt") : tree.resolve("b").resolve("f-" + i + ".txt");
       Files.writeString(file, "fixture-" + (i % 31), StandardOpenOption.CREATE_NEW);
     }
     try (Store store = new Store(db, "scan", "{}")) {
       Map<String,Object> first = obj(LocalScan.scan(store, tree, "{\"hash_algorithm\":\"SHA-256\"}"));
-      firstElapsed=Long.parseLong(J.text(first,"elapsed_ms","-1")); firstHashed=Long.parseLong(J.text(first,"hashed","-1"));
       ok("ok".equals(J.text(first, "status", "")), "first scan status");
-      ok("100000".equals(J.text(first, "files", "")), "first scan count");
-      ok(Long.parseLong(J.text(first, "hashed", "0")) == 100000, "initial scan hashes files");
+      ok(Integer.toString(FILES).equals(J.text(first, "files", "")), "first scan count");
+      ok(Long.parseLong(J.text(first, "hashed", "0")) == FILES, "initial scan hashes files");
       Map<String,Object> second = obj(LocalScan.scan(store, tree, "{}"));
-      noopElapsed=Long.parseLong(J.text(second,"elapsed_ms","-1")); noopHashed=Long.parseLong(J.text(second,"hashed","-1"));
-      ok("100000".equals(J.text(second, "files", "")), "repeat scan count");
+      ok(Integer.toString(FILES).equals(J.text(second, "files", "")), "repeat scan count");
       ok(Long.parseLong(J.text(second, "hashed", "-1")) == 0, "repeat scan avoids hashes");
       ok(Long.parseLong(J.text(second, "changed", "-1")) == 0, "repeat scan no changes");
-      ok(Long.parseLong(J.text(second, "elapsed_ms", "-1")) >= 0, "scan timing");
       String itemId=rootKey(tree)+":a/f-0.txt";
       Map<String,Object> stable=store.lookupIdentity(itemId); String stableRevision=J.text(stable,"revision",""); String stableHash=J.text(stable,"content_hash","");
       Map<String,Object> forced=obj(LocalScan.scan(store, tree, "{\"include\":[\"a/f-0.txt\"],\"always_hash\":true}"));
@@ -54,14 +51,14 @@ public final class ScanChecks {
       String eventsBefore=J.text(obj(store.call("stats")),"events",""); LocalScan.scan(store,tree,"{\"hash_algorithm\":\"SHA-1\",\"include\":[\"a/f-0.txt\"]}");
       ok(eventsBefore.equals(J.text(obj(store.call("stats")),"events","")),"unchanged scan emits no events");
       Map<String,Object> excluded = obj(LocalScan.scan(store, tree, "{\"exclude\":[\"a/*.txt\"]}"));
-      ok(Long.parseLong(J.text(excluded, "files", "0")) == 50000, "exclude glob");
+      ok(Long.parseLong(J.text(excluded, "files", "0")) == FILES/2, "exclude glob");
       reject(() -> LocalScan.scan(store, tree, "{\"unknown\":true}"), "unknown scan option");
       reject(() -> LocalScan.scan(store, tree, "{\"always_hash\":\"yes\"}"), "non-boolean scan option");
       reject(() -> LocalScan.scan(store, tree, "{\"shard\":2,\"shards\":2}"), "invalid shard");
       Path other= root.resolve("other"); Files.createDirectories(other); Files.writeString(other.resolve("f-0.txt"),"other");
       Map<String,Object> otherScan=obj(LocalScan.scan(store, other, "{}")); ok(Long.parseLong(J.text(otherScan,"files","0"))==1,"second root scan");
       ok(!store.lookupIdentity(rootKey(other)+":f-0.txt").isEmpty(),"root-scoped identity");
-      try { Files.createSymbolicLink(tree.resolve("link-to-f0"), changed); Map<String,Object> links=obj(LocalScan.scan(store, tree, "{}")); ok(Long.parseLong(J.text(links,"files","0"))==100000,"symlink not followed"); }
+      try { Files.createSymbolicLink(tree.resolve("link-to-f0"), changed); Map<String,Object> links=obj(LocalScan.scan(store, tree, "{}")); ok(Long.parseLong(J.text(links,"files","0"))==FILES,"symlink not followed"); }
       catch (UnsupportedOperationException ignored) { n++; }
       try { Map<String,Object> links=obj(LocalScan.scan(store, tree, "{\"follow_links\":true,\"include\":[\"link-to-f0\"]}")); ok(Long.parseLong(J.text(links,"files","0"))==1,"symlink follow mode"); }
       catch (UnsupportedOperationException ignored) { n++; }
@@ -70,9 +67,12 @@ public final class ScanChecks {
       try {
         Path partial=root.resolve("partial"); Files.createDirectories(partial);
         for(int i=0;i<300;i++)Files.writeString(partial.resolve("p"+i),"p"+i,StandardOpenOption.CREATE_NEW);
+        long beforePartial=Long.parseLong(J.text(obj(store.call("stats")),"items","0"));
+        LocalScan.scan(store,partial,"{\"max_files\":256}");
+        ok(Long.parseLong(J.text(obj(store.call("stats")),"items","0"))==beforePartial+256,"one committed batch before failure");
         Files.createSymbolicLink(partial.resolve("zz-loop"),partial);
         rejectRuntime(() -> LocalScan.scan(store,partial,"{\"follow_links\":true}"),"loop failure expected");
-        ok(Long.parseLong(J.text(obj(store.call("stats")),"items","0"))>100000,"batch before partial failure committed");
+        ok(Long.parseLong(J.text(obj(store.call("stats")),"items","0"))>=beforePartial+256,"committed batch survives failed rescan");
       } catch (UnsupportedOperationException|FileSystemException ignored) { n++; }
     }
     Path small=root.resolve("small"); Files.createDirectories(small);
@@ -88,14 +88,10 @@ public final class ScanChecks {
     return n;
   }
   public static String runReport(Path root) throws Exception {
-    long started=System.nanoTime(); int assertions=run(root); long elapsed=(System.nanoTime()-started)/1_000_000L;
-    double seconds=Math.max(0.001,elapsed/1000.0);
-    return J.str(Map.of("ok",true,"assertions",assertions,"files",100000L,"elapsed_ms",elapsed,
-      "first_scan_elapsed_ms",firstElapsed,"first_scan_hashed",firstHashed,
-      "noop_scan_elapsed_ms",noopElapsed,"noop_scan_hashed",noopHashed,
-      "first_scan_files_per_second",Math.round(100000.0/Math.max(0.001,firstElapsed/1000.0)),
-      "noop_scan_files_per_second",Math.round(100000.0/Math.max(0.001,noopElapsed/1000.0))));
+    int assertions=run(root);
+    return J.str(Map.of("ok",true,"assertions",assertions,"files",FILES));
   }
+
   public static void main(String[] args) throws Exception {
     if (args.length != 1) throw new IllegalArgumentException("scan checks require a directory");
     System.out.println(J.str(Map.of("ok", true, "assertions", run(Path.of(args[0])))));

@@ -196,3 +196,13 @@ The optional scan helper is implemented and qualified on100k local files. Real
 lmcurl0.1.2/lmssh0.1.1 local pairings and whole-job interruption recovery replace
 stand-ins for HTTP/SFTP. Cloud publication remains a deterministic local fake.
 The general indexes/cursors/archive/mailbox portion of1C remains deferred.
+
+
+## Current user decision: correctness only
+
+The historical10k observations above remain informational. Performance and scale
+measurement are not planned; no100M or large-upload qualification is a goal. Scan
+gates now use1,000 small synthetic files for functional cases and emit no timing
+or throughput report. The authorized100-object live S3 test is blocked before
+AWS by released lmaws0.1.22 API gaps; see S3_100_TEST.md. No IAM denial or cloud
+resource creation occurred.

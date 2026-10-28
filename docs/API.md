@@ -40,7 +40,8 @@ for diagnostics/tests; test-only --hold-lock is not a background daemon.
 
 Deferred 1C: arbitrary indexed attribute/hash/time/group queries,
 full event change-cursor API/checkpoints/archive management, multi-process owner
-mailbox, large-tier index/codec qualification and raw file download/provider gaps.
+mailbox and raw file download/provider gaps. Performance and scale measurement
+are not planned; correctness is the acceptance bar.
 No stub functions claim to implement those capabilities.
 
 Operational limits: individual decoded records <=1MiB and <=a quarter of the

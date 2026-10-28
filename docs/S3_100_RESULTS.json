@@ -1,0 +1,50 @@
+{
+  "status": "blocked_release_api",
+  "host_version": "0.1.22",
+  "missing_api": [
+    "s3_put_file",
+    "s3_head_object",
+    "s3_list_objects",
+    "s3_delete_objects",
+    "s3_bucket_create",
+    "s3_bucket_delete"
+  ],
+  "objects_requested": 100,
+  "buckets_created": 0,
+  "objects_created": 0,
+  "aws_requests": 0,
+  "ledger_opened": false,
+  "request_count_basis": "version_and_schema_only_no_aws_execution",
+  "estimated_cost_usd": 0,
+  "remote_absence_verified": false,
+  "phases": [
+    {
+      "phase": "first_publish",
+      "status": "not_run_release_api_gap"
+    },
+    {
+      "phase": "no_change_zero_requests",
+      "status": "not_run_release_api_gap"
+    },
+    {
+      "phase": "change_add_delete",
+      "status": "not_run_release_api_gap"
+    },
+    {
+      "phase": "crash_resume",
+      "status": "not_run_release_api_gap"
+    },
+    {
+      "phase": "uncertain_and_412",
+      "status": "not_run_release_api_gap"
+    },
+    {
+      "phase": "independent_verification",
+      "status": "not_run_release_api_gap"
+    },
+    {
+      "phase": "teardown",
+      "status": "not_run_release_api_gap"
+    }
+  ]
+}
