@@ -27,3 +27,8 @@ Use that binary on PATH. Exit2/BLOCKED is expected; all10 live phases remain NOT
 
 The gate runs9 pure s3-correctness-oracle unit tests. They test the model and
 comparison logic only, not S3 transport or live convergence. No scale study.
+
+The separately authorized local ramp uses scripts/test-scale.py with fixed40GB
+root-free minimum and25GB registry-directory maximum, a .5s parent monitor and
+batch guards. All data is synthetic; cleanup is mandatory. Default steps1M/5M/20M
+are opt-in, not a default gate. See docs/LOCAL_SCALE_TEST.md.

@@ -28,3 +28,8 @@ The same blocked S3 test now includes30 seeded rounds (seed20261027), an indepen
 model/three-way oracle, checksum/timestamp reconciliation and explicit listing
 import after DB loss. No live rounds ran; no max skew or convergence is claimed.
 Original client upload intervals cannot be reconstructed from listing alone.
+
+Latest Lead override authorizes a LOCAL1M/5M/20M correctness ramp independently
+of S3, guarded by40GB root free minimum and25GB registry maximum, mandatory
+temporary DB cleanup. Informational numbers only. See docs/LOCAL_SCALE_TEST.md;
+do not confuse this specific campaign with an open-ended performance roadmap.

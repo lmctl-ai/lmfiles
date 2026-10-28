@@ -31,6 +31,7 @@ public final class Main {
       case "--scan-test"->{System.out.println(ScanChecks.runReport(Path.of(args[1])));return 0;}
       case "--storage-test"->{System.out.println(J.str(Map.of("ok",true,"assertions",StorageChecks.run(Path.of(args[1])))));return 0;}
       case "--make-v1-fixture"->{StorageChecks.createLegacy(Path.of(args[1]));System.out.println("{\"status\":\"ok\"}");return 0;}
+      case "--scale-phase"->{if(args.length!=4)throw new IllegalArgumentException("--scale-phase DIR PHASE COUNT");ScaleChecks.run(Path.of(args[1]),args[2],Integer.parseInt(args[3]));return 0;}
       case "--benchmark"->{if(args.length!=3)throw new IllegalArgumentException("--benchmark DB COUNT");System.out.println(Bench.run(Path.of(args[1]),Integer.parseInt(args[2])));return 0;}
       case "--hold-lock"->{if(args.length!=3)throw new IllegalArgumentException("--hold-lock DB MILLISECONDS");try(Store s=new Store(Path.of(args[1]),"lock-test","{}")){System.out.println("ready");System.out.flush();Thread.sleep(Long.parseLong(args[2]));}return 0;}
       default->throw new IllegalArgumentException("unknown option; run lmfiles --help");

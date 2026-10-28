@@ -45,7 +45,7 @@ public final class Store implements AutoCloseable {
             // Default FileStore uses positional FileChannel I/O, never a mapped backend.
             String fault=System.getenv("LMFILES_KILL_POINT");
             var builder=new MVStore.Builder().cacheSize((int)cache).compress().autoCommitDisabled();
-            if(Set.of("mid_commit","mid_compaction","disk_full").contains(fault==null?"":fault)){
+            if(Set.of("mid_commit","mid_compaction","disk_full","scale_sigkill").contains(fault==null?"":fault)){
                 faultFile=new LmfilesFaultFileStore(fault);faultFile.open(this.path.toString(),false,null);builder.fileStore(faultFile);
             } else builder.fileName(this.path.toString());
             db=builder.open();
@@ -123,7 +123,7 @@ public final class Store implements AutoCloseable {
         if(op.equals("export_records")){if(a.length>1)keys(J.obj(a[1]),"v");return export(Path.of(a[0]));}
         if(op.equals("compact")){kill("before_compaction");int prevRetention=db.getRetentionTime();if(faultFile!=null||snapshots.isEmpty())db.setRetentionTime(0);if(faultFile!=null)faultFile.armed=true;try{db.compactFile(1000);db.sync();}finally{db.setRetentionTime(prevRetention);}kill("after_compaction");return ok();}
         if(op.equals("scan"))return LocalScan.scan(this,Path.of(a[0]),a[1]);
-        if(op.equals("stats"))return ok("examined",Long.toString(examined),"items",Long.toString(items.sizeAsLong()),"events",Long.toString(events.sizeAsLong()),"retention_ms",Integer.toString(db.getRetentionTime()));
+        if(op.equals("stats"))return ok("examined",Long.toString(examined),"items",Long.toString(items.sizeAsLong()),"events",Long.toString(events.sizeAsLong()),"aliases",Long.toString(aliases.sizeAsLong()),"claims",Long.toString(claims.sizeAsLong()),"retention_ms",Integer.toString(db.getRetentionTime()));
         if(op.equals("apply_records")){if(a.length>2)keys(J.obj(a[2]),"v");try{return PlanLog.apply(this,Path.of(a[0]),Path.of(a[1]));}catch(IOException e){throw new UncheckedIOException(e);}}
         expiryObserved=false;String response=mutate(()->change(op,a));if(expiryObserved)kill("after_claim_expiry");if(op.equals("claim"))kill("after_claim_commit");return response;
     }

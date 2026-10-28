@@ -28,6 +28,7 @@ trap 'rm -f "$schema_tmp"' EXIT
 cmp -s "$schema_tmp" "$schema_file" || { echo "generated schema is stale" >&2; exit 1; }
 python3 scripts/verify-deps.py
 run 30 python3 scripts/test-s3-oracle.py
+run 30 python3 scripts/test-scale-guard.py
 "${host[@]}" --dsl-signatures > "$schema_tmp.signatures"
 lmscript --dsl-signatures "$schema_file" > "$schema_tmp.expected"
 diff -u "$schema_tmp.expected" "$schema_tmp.signatures"
