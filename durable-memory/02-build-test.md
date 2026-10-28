@@ -7,7 +7,7 @@ address space4GiB/maxheap3GiB; address-space/memory tests are in test.sh.
 
 Managed: copy scripts/lmfiles-managed to target/bin/lmfiles. Run test.sh, build
 native, then test.sh --native. Each Linux gate runs63 core,17 journal,23 lease,
-22 review,111 storage and32 scan correctness assertions (1,000 synthetic files;
+22 review,114 storage and32 scan correctness assertions (1,000 synthetic files;
 no timing/throughput output), DSL/CLI scan bindings,
 21 subprocess checks/12 fault points, schema/notices, memory and gallery checks.
 Native additionally repeats core under a6GiB virtual-address limit.

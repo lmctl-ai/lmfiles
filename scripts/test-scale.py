@@ -309,7 +309,7 @@ def campaign(ns, command, report, work):
             payload["state"] = "guard_aborted"
             payload["guard_readings"].extend(current_runner.readings if current_runner else [])
             payload["guard_readings"].append(exc.reading)
-            payload["phases"].append({"phase": exc.reading.get("phase"), "state": "guard_aborted",
+            payload["phases"].append({"phase": current_runner.phase if current_runner else exc.reading.get("phase"), "count": count, "state": "guard_aborted",
                                       "guard_readings": [exc.reading], "error": str(exc)})
         elif isinstance(exc, PhaseFailure):
             payload["phases"].append(exc.result)

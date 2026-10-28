@@ -88,3 +88,9 @@ format change is made by this test.
 Current campaign results will be recorded here and in a sanitized machine-readable
 summary after completion. Guard readings, pass/fail, exact counts and informational
 throughput/bytes are reported; no large-tier guarantee is inferred from one disk.
+
+A review found and fixed a test-fixture conversion window: replacement now uses
+a single atomic REPLACE_EXISTING move, not delete-then-move. Regression checks
+prove that a missing conversion source preserves the acknowledged original and
+a complete conversion replaces it. The production format upgrader already used
+atomic replacement. No registry format or on-disk version changed.

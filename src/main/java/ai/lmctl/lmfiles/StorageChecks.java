@@ -105,6 +105,12 @@ public final class StorageChecks {
         byte[] trailing=java.util.Arrays.copyOf(compact,compact.length+1);try{Store.decode(trailing);throw new AssertionError("trailing compact event accepted");}catch(IllegalStateException expected){assertions++;}
         for(Map<String,Object> invalid:List.of(Map.of("sequence","0","item","3","operation","observe","committed_at","2026-01-01T00:00:00Z","data",Map.of()),Map.of("sequence","7","item","3","operation","","committed_at","2026-01-01T00:00:00Z","data",Map.of()),Map.of("sequence","7","item","3","operation","observe","committed_at","bad","data",Map.of()),Map.of("sequence","7","item","3","operation","observe","data",Map.of())))try{Store.encodeEvent(invalid);throw new AssertionError("invalid compact event accepted");}catch(IllegalArgumentException expected){assertions++;}
         try{Store.encodeEvent(Map.of("sequence","7","item","3","operation","observe","committed_at","2026-01-01T00:00:00Z","data",Map.of("blob","x".repeat(2_000_000))));throw new AssertionError("oversize compact event accepted");}catch(IllegalArgumentException expected){assertions++;}
+        Path swapTarget=root.resolve("fixture-swap-target"),swapSource=root.resolve("fixture-swap-source");
+        Files.writeString(swapTarget,"previous acknowledged fixture");
+        try{ScaleChecks.replaceFixture(swapSource,swapTarget);throw new AssertionError("missing conversion source accepted");}catch(java.io.IOException expected){assertions++;}
+        ok(Files.readString(swapTarget).equals("previous acknowledged fixture"),"failed fixture replacement preserves acknowledged original");
+        Files.writeString(swapSource,"complete converted fixture");ScaleChecks.replaceFixture(swapSource,swapTarget);
+        ok(Files.readString(swapTarget).equals("complete converted fixture")&&!Files.exists(swapSource),"fixture conversion atomically replaces original");
         Path db = root.resolve("legacy.mv");
         createLegacy(db);
         Path legacyExport=root.resolve("format1.jsonl");legacyExport(db,legacyExport);
