@@ -42,6 +42,17 @@ public final class ScanChecks {
       ok(Long.parseLong(J.text(forced,"hashed","0"))==1,"always hash");
       Map<String,Object> afterForced=store.lookupIdentity(itemId); ok(stableRevision.equals(J.text(afterForced,"revision","")),"always hash keeps revision"); ok(stableHash.equals(J.text(afterForced,"content_hash","")),"always hash keeps digest");
       ok(afterForced.get("observation") instanceof Map<?,?> && "SHA-256".equals(J.text((Map<String,Object>)afterForced.get("observation"),"algorithm","")),"algorithm recorded");
+      String stableItem=J.text(afterForced,"item","");
+      store.call("stage_record",stableItem,J.str(Map.of("stage","published","namespace","synthetic-s3","status","ok","source_revision",stableRevision,"source_fingerprint",Map.of("hash",stableHash))));
+      Path touched=tree.resolve("a/f-0.txt");
+      Files.setLastModifiedTime(touched,java.nio.file.attribute.FileTime.fromMillis(Files.getLastModifiedTime(touched).toMillis()+2000));
+      Map<String,Object> touchScan=obj(LocalScan.scan(store,tree,"{\"include\":[\"a/f-0.txt\"]}"));
+      ok("1".equals(J.text(touchScan,"hashed","")),"touch rechecks bytes after stat drift");
+      ok(stableRevision.equals(J.text(store.lookupIdentity(itemId),"revision","")),"touch with equal digest keeps content revision");
+      try(Store.Cursor cursor=store.query("query_subset","synthetic-s3",J.str(List.of(stableItem)),"{\"stage\":\"published\",\"namespace\":\"synthetic-s3\",\"projection\":\"last_success\"}")){
+        Map<String,Object> verdict=io.lmctl.lmcode.Json.object(((List<?>)J.parse(cursor.nextJson(1,1048576))).get(0));
+        ok("same-as-recorded".equals(J.text(verdict,"state","")),"touch yields an empty content-based upload plan");
+      }
       Path changed = tree.resolve("a/f-0.txt"); Files.writeString(changed, "changed", StandardOpenOption.TRUNCATE_EXISTING);
       Map<String,Object> third = obj(LocalScan.scan(store, tree, "{\"include\":[\"a/*.txt\"]}"));
       ok(Long.parseLong(J.text(third, "changed", "0")) == 1, "changed file detected");

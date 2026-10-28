@@ -139,3 +139,7 @@ The authorized100-object live S3 correctness test is [blocked by released lmaws
 0.1.22 API gaps](docs/S3_100_TEST.md). Its safe capability preflight opens no AWS
 session and exits2/BLOCKED: `AWS_PROFILE=lmaws lmctl https://raw.githubusercontent.com/lmctl-ai/lmfiles/main/examples/upload_s3_100_preflight.lms syntheticrun01`.
 No bucket or object was created; independent remote absence is not claimed.
+
+That same blocked test now specifies30 reproducible soak rounds (seed20261027),
+three-way file/registry/S3 reconciliation and listing-import recovery. The local
+independent oracle is tested; no live soak round or reconciliation has run.

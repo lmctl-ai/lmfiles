@@ -23,3 +23,8 @@ known_hosts. Native macOS/Windows support remains separately unverified.
 SDK JSON numbers use Double: use decimal strings for64bit metadata. SDK cache
 arena credits on close and PlanLog.unconfirmed per-line fsync optimization remain
 review lows11/12; no guarantees were weakened. Lead owns future releases.
+
+The same blocked S3 test now includes30 seeded rounds (seed20261027), an independent
+model/three-way oracle, checksum/timestamp reconciliation and explicit listing
+import after DB loss. No live rounds ran; no max skew or convergence is claimed.
+Original client upload intervals cannot be reconstructed from listing alone.

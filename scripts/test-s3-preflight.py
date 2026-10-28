@@ -16,8 +16,13 @@ def main():
         assert report['host_version']=='0.1.22' and len(report['missing_api'])==6;checks+=1
         assert report['aws_requests']==report['objects_created']==report['buckets_created']==report['estimated_cost_usd']==0
         assert report['ledger_opened'] is False and not list(work.rglob('*.jsonl'));checks+=1
-        assert report['remote_absence_verified'] is False and len(report['phases'])==7;checks+=1
+        assert report['remote_absence_verified'] is False and len(report['phases'])==10;checks+=1
         assert all(p['status']=='not_run_release_api_gap' for p in report['phases']);checks+=1
+        soak=report['soak']
+        assert soak['seed']==20261027 and soak['rounds_planned']==30 and soak['rounds_executed']==0
+        assert len(soak['rounds'])==30 and all(row['converged'] is None and row['operations'] is None and row['faults_injected']==0 for row in soak['rounds'])
+        assert soak['converged'] is None and soak['faults_injected']==soak['operations_executed']==0;checks+=1
+        assert len(report['reconciliation'])==8 and report['observed_max_skew_seconds'] is None and report['listing_rebuild_verified'] is False;checks+=1
         assert not any(word in json.dumps(report).lower() for word in ['arn:','account_id','syntheticrun01','lmaws-lmfiles-']);checks+=1
     print(json.dumps(dict(ok=True,preflight_checks=checks,live_phases_executed=0,aws_requests=0)))
 if __name__=='__main__':main()

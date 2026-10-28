@@ -39,6 +39,18 @@
       "status": "not_run_release_api_gap"
     },
     {
+      "phase": "seeded_soak",
+      "status": "not_run_release_api_gap"
+    },
+    {
+      "phase": "three_way_reconciliation",
+      "status": "not_run_release_api_gap"
+    },
+    {
+      "phase": "listing_import_rebuild",
+      "status": "not_run_release_api_gap"
+    },
+    {
       "phase": "independent_verification",
       "status": "not_run_release_api_gap"
     },
@@ -46,5 +58,267 @@
       "phase": "teardown",
       "status": "not_run_release_api_gap"
     }
-  ]
+  ],
+  "soak": {
+    "seed": 20261027,
+    "rounds_planned": 30,
+    "rounds_executed": 0,
+    "object_put_cap": 400,
+    "operations_executed": 0,
+    "faults_planned": [
+      "kill",
+      "lost_response",
+      "failed_upload"
+    ],
+    "faults_injected": 0,
+    "converged": null,
+    "rounds": [
+      {
+        "round": 1,
+        "status": "not_run_release_api_gap",
+        "operations": null,
+        "faults_injected": 0,
+        "converged": null
+      },
+      {
+        "round": 2,
+        "status": "not_run_release_api_gap",
+        "operations": null,
+        "faults_injected": 0,
+        "converged": null
+      },
+      {
+        "round": 3,
+        "status": "not_run_release_api_gap",
+        "operations": null,
+        "faults_injected": 0,
+        "converged": null
+      },
+      {
+        "round": 4,
+        "status": "not_run_release_api_gap",
+        "operations": null,
+        "faults_injected": 0,
+        "converged": null
+      },
+      {
+        "round": 5,
+        "status": "not_run_release_api_gap",
+        "operations": null,
+        "faults_injected": 0,
+        "converged": null
+      },
+      {
+        "round": 6,
+        "status": "not_run_release_api_gap",
+        "operations": null,
+        "faults_injected": 0,
+        "converged": null
+      },
+      {
+        "round": 7,
+        "status": "not_run_release_api_gap",
+        "operations": null,
+        "faults_injected": 0,
+        "converged": null
+      },
+      {
+        "round": 8,
+        "status": "not_run_release_api_gap",
+        "operations": null,
+        "faults_injected": 0,
+        "converged": null
+      },
+      {
+        "round": 9,
+        "status": "not_run_release_api_gap",
+        "operations": null,
+        "faults_injected": 0,
+        "converged": null
+      },
+      {
+        "round": 10,
+        "status": "not_run_release_api_gap",
+        "operations": null,
+        "faults_injected": 0,
+        "converged": null
+      },
+      {
+        "round": 11,
+        "status": "not_run_release_api_gap",
+        "operations": null,
+        "faults_injected": 0,
+        "converged": null
+      },
+      {
+        "round": 12,
+        "status": "not_run_release_api_gap",
+        "operations": null,
+        "faults_injected": 0,
+        "converged": null
+      },
+      {
+        "round": 13,
+        "status": "not_run_release_api_gap",
+        "operations": null,
+        "faults_injected": 0,
+        "converged": null
+      },
+      {
+        "round": 14,
+        "status": "not_run_release_api_gap",
+        "operations": null,
+        "faults_injected": 0,
+        "converged": null
+      },
+      {
+        "round": 15,
+        "status": "not_run_release_api_gap",
+        "operations": null,
+        "faults_injected": 0,
+        "converged": null
+      },
+      {
+        "round": 16,
+        "status": "not_run_release_api_gap",
+        "operations": null,
+        "faults_injected": 0,
+        "converged": null
+      },
+      {
+        "round": 17,
+        "status": "not_run_release_api_gap",
+        "operations": null,
+        "faults_injected": 0,
+        "converged": null
+      },
+      {
+        "round": 18,
+        "status": "not_run_release_api_gap",
+        "operations": null,
+        "faults_injected": 0,
+        "converged": null
+      },
+      {
+        "round": 19,
+        "status": "not_run_release_api_gap",
+        "operations": null,
+        "faults_injected": 0,
+        "converged": null
+      },
+      {
+        "round": 20,
+        "status": "not_run_release_api_gap",
+        "operations": null,
+        "faults_injected": 0,
+        "converged": null
+      },
+      {
+        "round": 21,
+        "status": "not_run_release_api_gap",
+        "operations": null,
+        "faults_injected": 0,
+        "converged": null
+      },
+      {
+        "round": 22,
+        "status": "not_run_release_api_gap",
+        "operations": null,
+        "faults_injected": 0,
+        "converged": null
+      },
+      {
+        "round": 23,
+        "status": "not_run_release_api_gap",
+        "operations": null,
+        "faults_injected": 0,
+        "converged": null
+      },
+      {
+        "round": 24,
+        "status": "not_run_release_api_gap",
+        "operations": null,
+        "faults_injected": 0,
+        "converged": null
+      },
+      {
+        "round": 25,
+        "status": "not_run_release_api_gap",
+        "operations": null,
+        "faults_injected": 0,
+        "converged": null
+      },
+      {
+        "round": 26,
+        "status": "not_run_release_api_gap",
+        "operations": null,
+        "faults_injected": 0,
+        "converged": null
+      },
+      {
+        "round": 27,
+        "status": "not_run_release_api_gap",
+        "operations": null,
+        "faults_injected": 0,
+        "converged": null
+      },
+      {
+        "round": 28,
+        "status": "not_run_release_api_gap",
+        "operations": null,
+        "faults_injected": 0,
+        "converged": null
+      },
+      {
+        "round": 29,
+        "status": "not_run_release_api_gap",
+        "operations": null,
+        "faults_injected": 0,
+        "converged": null
+      },
+      {
+        "round": 30,
+        "status": "not_run_release_api_gap",
+        "operations": null,
+        "faults_injected": 0,
+        "converged": null
+      }
+    ]
+  },
+  "reconciliation": [
+    {
+      "check": "key_sets",
+      "status": "not_run_release_api_gap"
+    },
+    {
+      "check": "sizes",
+      "status": "not_run_release_api_gap"
+    },
+    {
+      "check": "sha256",
+      "status": "not_run_release_api_gap"
+    },
+    {
+      "check": "etag_md5",
+      "status": "not_run_release_api_gap"
+    },
+    {
+      "check": "version_and_headers",
+      "status": "not_run_release_api_gap"
+    },
+    {
+      "check": "timestamp_interval",
+      "status": "not_run_release_api_gap"
+    },
+    {
+      "check": "round_revision_order",
+      "status": "not_run_release_api_gap"
+    },
+    {
+      "check": "model_vs_local",
+      "status": "not_run_release_api_gap"
+    }
+  ],
+  "observed_max_skew_seconds": null,
+  "listing_rebuild_verified": false
 }
