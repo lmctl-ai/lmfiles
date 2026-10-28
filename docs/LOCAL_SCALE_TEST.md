@@ -85,12 +85,74 @@ frontier, and the retained format2 backup's header/counts/sample rows. Only this
 throwaway fixture's redundant backup is removed after verification. No registry
 format change is made by this test.
 
-Current campaign results will be recorded here and in a sanitized machine-readable
-summary after completion. Guard readings, pass/fail, exact counts and informational
-throughput/bytes are reported; no large-tier guarantee is inferred from one disk.
+Campaign results are recorded below and in [LOCAL_SCALE_RESULTS.json](LOCAL_SCALE_RESULTS.json).
+No large-tier guarantee is inferred from one disk or this particular synthetic profile.
 
 A review found and fixed a test-fixture conversion window: replacement now uses
 a single atomic REPLACE_EXISTING move, not delete-then-move. Regression checks
 prove that a missing conversion source preserves the acknowledged original and
 a complete conversion replaces it. The production format upgrader already used
 atomic replacement. No registry format or on-disk version changed.
+
+
+## Completed campaign
+
+**PASS through the requested20M indexed items.** This was the managed JVM worker;
+native full gates and a1,000-item native all-phase smoke passed separately. Each
+step passed indexing, exact counts, identity/alias/unknown lookups, all selected
+updates, latest/success projections, exact subset/frontier membership, leased
+claim completion, reopen, real SIGKILL recovery and doctor.
+
+| Items | Aliases | Audit events after crash recovery | Updated/checked | Sample items + boundaries | Pending frontier after claims |
+|---:|---:|---:|---:|---:|---:|
+| 1,000,000 | 2,000,000 | 5,055,805 | 10,000 | 10,009 | 4,186 |
+| 5,000,000 | 10,000,000 | 25,335,306 | 50,000 | 10,012 | 24,027 |
+| 20,000,000 | 40,000,000 | 101,453,925 | 200,000 | 10,015 | 101,161 |
+
+Every step completed128 claims; active claims at the checkpoints were0. Failed
+attempts preserved the previous successful revision for every updated item.
+Recovery retained acknowledged markers and showed0 phantom identities/rows/events.
+The snapshot/expected-state model stays bounded; no millions-item expected set is
+held in RAM. Counts and sampled content are checked independently of stored rows.
+
+| Maintenance |1M |5M |20M |
+|---|---|---|---|
+| Compaction + re-verification | PASS | PASS | SKIPPED—headroom |
+| Format2→3, backup samples, doctor + re-verification | PASS | SKIPPED—headroom | SKIPPED—headroom |
+
+These are pre-allocation safety skips, not completed maintenance tests or actual
+hard-limit violations. With the documented25% migration-estimate margin, the
+projected peaks were27.10GB for the5M upgrade,53.10GB for20M compaction and108.41GB
+for20M upgrade. The cap stayed25GB. Largest verified compaction:5M; largest
+verified format upgrade:1M. No100M attempt and no attempt to fill the disk.
+
+| Step | Newly indexed | Index items/s | Updated items/s | Physical DB bytes/item at end of step |
+|---:|---:|---:|---:|---:|
+| 1,000,000 | 1,000,000 | 5,260 | 675 | 1,113.5 |
+| 5,000,000 | 4,000,000 | 5,277 | 811 | 955.0 |
+| 20,000,000 | 15,000,000 | 6,726 | 1,469 | 884.9 |
+
+Numbers are informational observations from a shared machine. They include normal
+MVStore retained pages and differ by operation history; they are not latency,
+capacity or steady-state compression guarantees. This profile has one explicit
+alias plus identity and two stages, unlike the historical10k profile.
+
+Guard summary (decimal GB):
+
+- Minimum root free observed: **82.33GB**, above40GB.
+- Maximum fixture observed: **17.70GB**, below25GB.
+- Recorded guard readings: 8,914.
+- Final temporary-directory cleanup: **verified**, with independent path-absence check.
+- Root free after cleanup: 104.88GB (other teams may change it).
+
+No registry correctness failure was observed. The test-only atomic conversion
+window described above was fixed with3 regression assertions; no format change
+was needed. The campaign used the frozen9a3fba0 worker archive; fd45ed5 corrects
+that test-fixture failure window and passes the managed/native gates and native
+smoke. Successful conversion data were reverified in the campaign. The production
+upgrader already used atomic replacement. Exact revisions and archive digest are
+in the machine-readable result.
+
+Local gates:271 registry assertions,21 subprocess checks and17 disk-guard unit
+tests per gate (managed/native), plus9 pure S3-oracle tests. No AWS/admin command,
+CI dispatch, tag or release was performed. S3 live work remains separately blocked.

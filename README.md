@@ -143,3 +143,8 @@ No bucket or object was created; independent remote absence is not claimed.
 That same blocked test now specifies30 reproducible soak rounds (seed20261027),
 three-way file/registry/S3 reconciliation and listing-import recovery. The local
 independent oracle is tested; no live soak round or reconciliation has run.
+
+The separately authorized [guarded local index/get/update correctness run](docs/LOCAL_SCALE_TEST.md)
+passed through20M items, with mandatory cleanup verified. Maintenance headroom
+limited compaction to5M and format2→3 upgrade to1M. Numbers are informational;
+the hard40GB-free/25GB-directory guards remain mandatory.

@@ -1,0 +1,848 @@
+{
+  "state": "ok",
+  "scope": "Local synthetic correctness; timings and sizes informational only",
+  "guards": {
+    "minimum_root_free_bytes": 40000000000,
+    "maximum_registry_bytes": 25000000000,
+    "readings": 8914,
+    "minimum_root_free_observed": 82332033024,
+    "maximum_registry_observed": 17699299328
+  },
+  "cleanup_verified": true,
+  "directory_independently_absent": true,
+  "largest_indexed": 20000000,
+  "largest_compacted": 5000000,
+  "largest_upgraded": 1000000,
+  "steps": [
+    {
+      "items_requested": 1000000,
+      "operations": [
+        {
+          "operation": "build",
+          "status": "ok",
+          "seconds_informational": 190.099093598,
+          "exact_counts": {
+            "aliases": "2000000",
+            "claims": "0",
+            "events": "4999000",
+            "examined": "0",
+            "items": "1000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "db_bytes": 804274176,
+          "bytes_per_item_informational": 804.274176,
+          "guard": {
+            "samples": 381,
+            "free_before": 105594212352,
+            "free_after": 104788434944,
+            "minimum_free": 104788434944,
+            "maximum_directory": 804298752
+          },
+          "items_added": 1000000,
+          "items_per_second_informational": 5260.414350605409
+        },
+        {
+          "operation": "verify",
+          "status": "ok",
+          "seconds_informational": 2.181663595,
+          "exact_counts": {
+            "aliases": "2000000",
+            "claims": "0",
+            "events": "4999000",
+            "examined": "0",
+            "items": "1000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "samples": 10009,
+          "subset_rows": 10009,
+          "frontier_rows": 1000,
+          "db_bytes": 804274176,
+          "bytes_per_item_informational": 804.274176,
+          "guard": {
+            "samples": 6,
+            "free_before": 104788271104,
+            "free_after": 104788258816,
+            "minimum_free": 104788226048,
+            "maximum_directory": 804298752
+          }
+        },
+        {
+          "operation": "update",
+          "status": "ok",
+          "seconds_informational": 14.805805663,
+          "exact_counts": {
+            "aliases": "2000000",
+            "claims": "0",
+            "events": "5055676",
+            "examined": "0",
+            "items": "1000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "updated": 10000,
+          "failed_after_success_verified": 10000,
+          "db_bytes": 921669632,
+          "bytes_per_item_informational": 921.669632,
+          "guard": {
+            "samples": 31,
+            "free_before": 104788254720,
+            "free_after": 104670683136,
+            "minimum_free": 104670683136,
+            "maximum_directory": 921702400
+          },
+          "updates_per_second_informational": 675.4107292513097
+        },
+        {
+          "operation": "claim",
+          "status": "ok",
+          "seconds_informational": 0.778075769,
+          "exact_counts": {
+            "aliases": "2000000",
+            "claims": "0",
+            "events": "5055804",
+            "examined": "0",
+            "items": "1000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "claimed_and_completed": 128,
+          "db_bytes": 924704768,
+          "bytes_per_item_informational": 924.704768,
+          "guard": {
+            "samples": 3,
+            "free_before": 104670666752,
+            "free_after": 104667631616,
+            "minimum_free": 104667631616,
+            "maximum_directory": 924737536
+          }
+        },
+        {
+          "operation": "reopen",
+          "status": "ok",
+          "seconds_informational": 2.120394335,
+          "exact_counts": {
+            "aliases": "2000000",
+            "claims": "0",
+            "events": "5055804",
+            "examined": "0",
+            "items": "1000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "samples": 10009,
+          "subset_rows": 10009,
+          "frontier_rows": 4186,
+          "db_bytes": 924704768,
+          "bytes_per_item_informational": 924.704768,
+          "guard": {
+            "samples": 6,
+            "free_before": 104667631616,
+            "free_after": 104667615232,
+            "minimum_free": 104667586560,
+            "maximum_directory": 924737536
+          }
+        },
+        {
+          "operation": "crash_prepare",
+          "status": "ok",
+          "seconds_informational": 0.239354784,
+          "exact_counts": {
+            "aliases": "2000000",
+            "claims": "0",
+            "events": "5055805",
+            "examined": "0",
+            "items": "1000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "db_bytes": 924729344,
+          "bytes_per_item_informational": 924.729344,
+          "guard": {
+            "samples": 2,
+            "free_before": 104667611136,
+            "free_after": 104667586560,
+            "minimum_free": 104667586560,
+            "maximum_directory": 924762112
+          }
+        },
+        {
+          "operation": "crash",
+          "status": "ok",
+          "seconds_informational": 0.3508124351501465,
+          "guard": {
+            "samples": 1,
+            "free_before": 104667582464,
+            "free_after": 104667582464,
+            "minimum_free": 104667582464,
+            "maximum_directory": 924762112
+          },
+          "signal": "SIGKILL",
+          "half_written_commit_observed": true
+        },
+        {
+          "operation": "recover",
+          "status": "ok",
+          "seconds_informational": 0.206567452,
+          "exact_counts": {
+            "aliases": "2000000",
+            "claims": "0",
+            "events": "5055805",
+            "examined": "0",
+            "items": "1000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "confirmed_records_retained": true,
+          "phantoms": 0,
+          "db_bytes": 924729344,
+          "bytes_per_item_informational": 924.729344,
+          "guard": {
+            "samples": 2,
+            "free_before": 104667504640,
+            "free_after": 104667582464,
+            "minimum_free": 104667504640,
+            "maximum_directory": 924807168
+          }
+        },
+        {
+          "operation": "doctor",
+          "status": "ok",
+          "seconds_informational": 26.309073102,
+          "exact_counts": {
+            "aliases": "2000000",
+            "claims": "0",
+            "events": "5055805",
+            "examined": "0",
+            "items": "1000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "db_bytes": 924729344,
+          "bytes_per_item_informational": 924.729344,
+          "guard": {
+            "samples": 54,
+            "free_before": 104667578368,
+            "free_after": 104666415104,
+            "minimum_free": 104666382336,
+            "maximum_directory": 924762112
+          }
+        },
+        {
+          "operation": "compact",
+          "status": "ok",
+          "seconds_informational": 3.120335211,
+          "exact_counts": {
+            "aliases": "2000000",
+            "claims": "0",
+            "events": "5055805",
+            "examined": "0",
+            "items": "1000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "samples": 10009,
+          "subset_rows": 10009,
+          "frontier_rows": 4186,
+          "db_bytes": 982552576,
+          "bytes_per_item_informational": 982.552576,
+          "guard": {
+            "samples": 8,
+            "free_before": 104666394624,
+            "free_after": 104608440320,
+            "minimum_free": 104608407552,
+            "maximum_directory": 982585344
+          }
+        },
+        {
+          "operation": "upgrade",
+          "status": "ok",
+          "seconds_informational": 235.06245726,
+          "exact_counts": {
+            "aliases": "2000000",
+            "claims": "0",
+            "events": "5055805",
+            "examined": "0",
+            "items": "1000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "backup_verified": true,
+          "upgraded_items": 1000000,
+          "format2_bytes": 1611497472,
+          "post_upgrade": {
+            "frontier_rows": 4186,
+            "samples": 10009,
+            "subset_rows": 10009
+          },
+          "db_bytes": 1113485312,
+          "bytes_per_item_informational": 1113.485312,
+          "guard": {
+            "samples": 471,
+            "free_before": 104608436224,
+            "free_after": 104370176000,
+            "minimum_free": 101147041792,
+            "maximum_directory": 4336558080
+          }
+        }
+      ]
+    },
+    {
+      "items_requested": 5000000,
+      "operations": [
+        {
+          "operation": "build",
+          "status": "ok",
+          "seconds_informational": 757.947145536,
+          "exact_counts": {
+            "aliases": "10000000",
+            "claims": "0",
+            "events": "25051805",
+            "examined": "0",
+            "items": "5000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "db_bytes": 4358774784,
+          "bytes_per_item_informational": 871.7549568,
+          "guard": {
+            "samples": 1516,
+            "free_before": 104369975296,
+            "free_after": 101053480960,
+            "minimum_free": 101053460480,
+            "maximum_directory": 4358864896
+          },
+          "items_added": 4000000,
+          "items_per_second_informational": 5277.412842779831
+        },
+        {
+          "operation": "verify",
+          "status": "ok",
+          "seconds_informational": 3.262263829,
+          "exact_counts": {
+            "aliases": "10000000",
+            "claims": "0",
+            "events": "25051805",
+            "examined": "0",
+            "items": "5000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "samples": 10012,
+          "subset_rows": 10012,
+          "frontier_rows": 8186,
+          "db_bytes": 4358774784,
+          "bytes_per_item_informational": 871.7549568,
+          "guard": {
+            "samples": 8,
+            "free_before": 101052837888,
+            "free_after": 101052833792,
+            "minimum_free": 101052805120,
+            "maximum_directory": 4358864896
+          }
+        },
+        {
+          "operation": "update",
+          "status": "ok",
+          "seconds_informational": 61.615609997,
+          "exact_counts": {
+            "aliases": "10000000",
+            "claims": "0",
+            "events": "25335177",
+            "examined": "0",
+            "items": "5000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "updated": 50000,
+          "failed_after_success_verified": 50000,
+          "db_bytes": 4757377024,
+          "bytes_per_item_informational": 951.4754048,
+          "guard": {
+            "samples": 125,
+            "free_before": 101052829696,
+            "free_after": 100654014464,
+            "minimum_free": 100653985792,
+            "maximum_directory": 4757479424
+          },
+          "updates_per_second_informational": 811.4826746409627
+        },
+        {
+          "operation": "claim",
+          "status": "ok",
+          "seconds_informational": 1.047615617,
+          "exact_counts": {
+            "aliases": "10000000",
+            "claims": "0",
+            "events": "25335305",
+            "examined": "0",
+            "items": "5000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "claimed_and_completed": 128,
+          "db_bytes": 4760481792,
+          "bytes_per_item_informational": 952.0963584,
+          "guard": {
+            "samples": 4,
+            "free_before": 100653957120,
+            "free_after": 100650848256,
+            "minimum_free": 100650815488,
+            "maximum_directory": 4760588288
+          }
+        },
+        {
+          "operation": "reopen",
+          "status": "ok",
+          "seconds_informational": 3.367917747,
+          "exact_counts": {
+            "aliases": "10000000",
+            "claims": "0",
+            "events": "25335305",
+            "examined": "0",
+            "items": "5000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "samples": 10012,
+          "subset_rows": 10012,
+          "frontier_rows": 24027,
+          "db_bytes": 4760481792,
+          "bytes_per_item_informational": 952.0963584,
+          "guard": {
+            "samples": 8,
+            "free_before": 100650844160,
+            "free_after": 100650840064,
+            "minimum_free": 100650811392,
+            "maximum_directory": 4760588288
+          }
+        },
+        {
+          "operation": "crash_prepare",
+          "status": "ok",
+          "seconds_informational": 0.545734219,
+          "exact_counts": {
+            "aliases": "10000000",
+            "claims": "0",
+            "events": "25335306",
+            "examined": "0",
+            "items": "5000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "db_bytes": 4760526848,
+          "bytes_per_item_informational": 952.1053696,
+          "guard": {
+            "samples": 3,
+            "free_before": 100650835968,
+            "free_after": 100650790912,
+            "minimum_free": 100650758144,
+            "maximum_directory": 4760633344
+          }
+        },
+        {
+          "operation": "crash",
+          "status": "ok",
+          "seconds_informational": 0.49222445487976074,
+          "guard": {
+            "samples": 1,
+            "free_before": 100650786816,
+            "free_after": 100650786816,
+            "minimum_free": 100650786816,
+            "maximum_directory": 4760633344
+          },
+          "signal": "SIGKILL",
+          "half_written_commit_observed": true
+        },
+        {
+          "operation": "recover",
+          "status": "ok",
+          "seconds_informational": 0.519568046,
+          "exact_counts": {
+            "aliases": "10000000",
+            "claims": "0",
+            "events": "25335306",
+            "examined": "0",
+            "items": "5000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "confirmed_records_retained": true,
+          "phantoms": 0,
+          "db_bytes": 4760526848,
+          "bytes_per_item_informational": 952.1053696,
+          "guard": {
+            "samples": 3,
+            "free_before": 100650680320,
+            "free_after": 100650786816,
+            "minimum_free": 100650680320,
+            "maximum_directory": 4760707072
+          }
+        },
+        {
+          "operation": "doctor",
+          "status": "ok",
+          "seconds_informational": 148.839091967,
+          "exact_counts": {
+            "aliases": "10000000",
+            "claims": "0",
+            "events": "25335306",
+            "examined": "0",
+            "items": "5000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "db_bytes": 4760526848,
+          "bytes_per_item_informational": 952.1053696,
+          "guard": {
+            "samples": 299,
+            "free_before": 100650782720,
+            "free_after": 100649832448,
+            "minimum_free": 100356489216,
+            "maximum_directory": 4760633344
+          }
+        },
+        {
+          "operation": "compact",
+          "status": "ok",
+          "seconds_informational": 4.417370575,
+          "exact_counts": {
+            "aliases": "10000000",
+            "claims": "0",
+            "events": "25335306",
+            "examined": "0",
+            "items": "5000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "samples": 10012,
+          "subset_rows": 10012,
+          "frontier_rows": 24027,
+          "db_bytes": 4775243776,
+          "bytes_per_item_informational": 955.0487552,
+          "guard": {
+            "samples": 11,
+            "free_before": 100649713664,
+            "free_after": 100634988544,
+            "minimum_free": 100634955776,
+            "maximum_directory": 4775350272
+          }
+        },
+        {
+          "operation": "upgrade",
+          "status": "skipped_headroom",
+          "seconds_informational": 0.297851014,
+          "exact_counts": {
+            "aliases": "10000000",
+            "claims": "0",
+            "events": "25335306",
+            "examined": "0",
+            "items": "5000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "source_bytes": 4775243776,
+          "conservative_extra_bytes": 22327757824,
+          "db_bytes": 4775243776,
+          "bytes_per_item_informational": 955.0487552,
+          "guard": {
+            "samples": 2,
+            "free_before": 100634980352,
+            "free_after": 100634980352,
+            "minimum_free": 100634980352,
+            "maximum_directory": 4775350272
+          }
+        }
+      ]
+    },
+    {
+      "items_requested": 20000000,
+      "operations": [
+        {
+          "operation": "build",
+          "status": "ok",
+          "seconds_informational": 2230.31415307,
+          "exact_counts": {
+            "aliases": "40000000",
+            "claims": "0",
+            "events": "100320306",
+            "examined": "0",
+            "items": "20000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "db_bytes": 17072336896,
+          "bytes_per_item_informational": 853.6168448,
+          "guard": {
+            "samples": 4459,
+            "free_before": 100634976256,
+            "free_after": 88344924160,
+            "minimum_free": 84002697216,
+            "maximum_directory": 17072672768
+          },
+          "items_added": 15000000,
+          "items_per_second_informational": 6725.509937401726
+        },
+        {
+          "operation": "verify",
+          "status": "ok",
+          "seconds_informational": 15.136031535,
+          "exact_counts": {
+            "aliases": "40000000",
+            "claims": "0",
+            "events": "100320306",
+            "examined": "0",
+            "items": "20000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "samples": 10015,
+          "subset_rows": 10015,
+          "frontier_rows": 39027,
+          "db_bytes": 17072336896,
+          "bytes_per_item_informational": 853.6168448,
+          "guard": {
+            "samples": 32,
+            "free_before": 88343003136,
+            "free_after": 88342986752,
+            "minimum_free": 88342953984,
+            "maximum_directory": 17072672768
+          }
+        },
+        {
+          "operation": "update",
+          "status": "ok",
+          "seconds_informational": 136.135950804,
+          "exact_counts": {
+            "aliases": "40000000",
+            "claims": "0",
+            "events": "101453796",
+            "examined": "0",
+            "items": "20000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "updated": 200000,
+          "failed_after_success_verified": 200000,
+          "db_bytes": 17697210368,
+          "bytes_per_item_informational": 884.8605184,
+          "guard": {
+            "samples": 274,
+            "free_before": 88342970368,
+            "free_after": 87178444800,
+            "minimum_free": 87178412032,
+            "maximum_directory": 17697558528
+          },
+          "updates_per_second_informational": 1469.1196470794657
+        },
+        {
+          "operation": "claim",
+          "status": "ok",
+          "seconds_informational": 1.476530341,
+          "exact_counts": {
+            "aliases": "40000000",
+            "claims": "0",
+            "events": "101453924",
+            "examined": "0",
+            "items": "20000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "claimed_and_completed": 128,
+          "db_bytes": 17698885632,
+          "bytes_per_item_informational": 884.9442816,
+          "guard": {
+            "samples": 5,
+            "free_before": 87178309632,
+            "free_after": 87176622080,
+            "minimum_free": 87176589312,
+            "maximum_directory": 17699233792
+          }
+        },
+        {
+          "operation": "reopen",
+          "status": "ok",
+          "seconds_informational": 6.184799334,
+          "exact_counts": {
+            "aliases": "40000000",
+            "claims": "0",
+            "events": "101453924",
+            "examined": "0",
+            "items": "20000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "samples": 10015,
+          "subset_rows": 10015,
+          "frontier_rows": 101161,
+          "db_bytes": 17698885632,
+          "bytes_per_item_informational": 884.9442816,
+          "guard": {
+            "samples": 14,
+            "free_before": 87176617984,
+            "free_after": 87176310784,
+            "minimum_free": 87176278016,
+            "maximum_directory": 17699233792
+          }
+        },
+        {
+          "operation": "crash_prepare",
+          "status": "ok",
+          "seconds_informational": 0.830599358,
+          "exact_counts": {
+            "aliases": "40000000",
+            "claims": "0",
+            "events": "101453925",
+            "examined": "0",
+            "items": "20000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "db_bytes": 17698885632,
+          "bytes_per_item_informational": 884.9442816,
+          "guard": {
+            "samples": 3,
+            "free_before": 87176302592,
+            "free_after": 87176269824,
+            "minimum_free": 87176237056,
+            "maximum_directory": 17699233792
+          }
+        },
+        {
+          "operation": "crash",
+          "status": "ok",
+          "seconds_informational": 0.6261610984802246,
+          "guard": {
+            "samples": 2,
+            "free_before": 87176269824,
+            "free_after": 87176237056,
+            "minimum_free": 87176237056,
+            "maximum_directory": 17699233792
+          },
+          "signal": "SIGKILL",
+          "half_written_commit_observed": true
+        },
+        {
+          "operation": "recover",
+          "status": "ok",
+          "seconds_informational": 0.682885357,
+          "exact_counts": {
+            "aliases": "40000000",
+            "claims": "0",
+            "events": "101453925",
+            "examined": "0",
+            "items": "20000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "confirmed_records_retained": true,
+          "phantoms": 0,
+          "db_bytes": 17698885632,
+          "bytes_per_item_informational": 884.9442816,
+          "guard": {
+            "samples": 3,
+            "free_before": 87176167424,
+            "free_after": 87176261632,
+            "minimum_free": 87176167424,
+            "maximum_directory": 17699299328
+          }
+        },
+        {
+          "operation": "doctor",
+          "status": "ok",
+          "seconds_informational": 584.021713568,
+          "exact_counts": {
+            "aliases": "40000000",
+            "claims": "0",
+            "events": "101453925",
+            "examined": "0",
+            "items": "20000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "db_bytes": 17698885632,
+          "bytes_per_item_informational": 884.9442816,
+          "guard": {
+            "samples": 1168,
+            "free_before": 87176257536,
+            "free_after": 87183843328,
+            "minimum_free": 82332033024,
+            "maximum_directory": 17699233792
+          }
+        },
+        {
+          "operation": "compact",
+          "status": "skipped_headroom",
+          "seconds_informational": 0.447324346,
+          "exact_counts": {
+            "aliases": "40000000",
+            "claims": "0",
+            "events": "101453925",
+            "examined": "0",
+            "items": "20000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "source_bytes": 17698885632,
+          "conservative_extra_bytes": 35397771264,
+          "db_bytes": 17698885632,
+          "bytes_per_item_informational": 884.9442816,
+          "guard": {
+            "samples": 3,
+            "free_before": 87183376384,
+            "free_after": 87183376384,
+            "minimum_free": 87183343616,
+            "maximum_directory": 17699233792
+          }
+        },
+        {
+          "operation": "upgrade",
+          "status": "skipped_headroom",
+          "seconds_informational": 0.418017532,
+          "exact_counts": {
+            "aliases": "40000000",
+            "claims": "0",
+            "events": "101453925",
+            "examined": "0",
+            "items": "20000000",
+            "retention_ms": "45000",
+            "status": "ok"
+          },
+          "source_bytes": 17698885632,
+          "conservative_extra_bytes": 90713120768,
+          "db_bytes": 17698885632,
+          "bytes_per_item_informational": 884.9442816,
+          "guard": {
+            "samples": 3,
+            "free_before": 87183368192,
+            "free_after": 87183360000,
+            "minimum_free": 87183327232,
+            "maximum_directory": 17699233792
+          }
+        }
+      ]
+    }
+  ],
+  "aws_requests": 0,
+  "admin_commands": 0,
+  "tag_or_release_created": false,
+  "campaign_worker_source_commit": "9a3fba0ec7fac6b3c873c842dfb2b3f15d2a1691",
+  "campaign_worker_archive_sha256": "d0c682e3205e8e9f80ea0f0f62adefe745b9662283b35cd92d16088df3fc3a96",
+  "post_review_fix_commit": "fd45ed540956f27afbbb60555a7782d532b5ecdb",
+  "worker_note": "Campaign used a frozen worker archive. Later test-only fixture replacement was made atomic and covered by managed/native regressions; the production upgrader was already atomic.",
+  "runtime": "Managed Java21 -Xmx1536m;64MiB MVStore cache. Native full gates and1000-item all-phase smoke separately passed.",
+  "root_free_after_cleanup": 104882233344,
+  "gates": {
+    "managed": "passed",
+    "native": "passed",
+    "registry_assertions_per_gate": 271,
+    "subprocess_checks_per_gate": 21,
+    "guard_unit_tests": 17,
+    "native_all_phase_smoke_items": 1000,
+    "managed_two_step_smoke_items": [
+      1000,
+      5000
+    ]
+  }
+}

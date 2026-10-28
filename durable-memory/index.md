@@ -19,3 +19,5 @@
 - [../docs/S3_100_RESULTS.json](../docs/S3_100_RESULTS.json): sanitized counts/status; no AWS session or resources created.
 
 - [../docs/LOCAL_SCALE_TEST.md](../docs/LOCAL_SCALE_TEST.md): explicitly authorized local guarded correctness ramp, independent of S3.
+
+- [../docs/LOCAL_SCALE_RESULTS.json](../docs/LOCAL_SCALE_RESULTS.json): completed guarded local campaign counts, maintenance skips and cleanup evidence.

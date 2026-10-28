@@ -32,3 +32,8 @@ The separately authorized local ramp uses scripts/test-scale.py with fixed40GB
 root-free minimum and25GB registry-directory maximum, a .5s parent monitor and
 batch guards. All data is synthetic; cleanup is mandatory. Default steps1M/5M/20M
 are opt-in, not a default gate. See docs/LOCAL_SCALE_TEST.md.
+
+Completed local campaign:1M/5M/20M core correctness passed; all DB files removed.
+Maintenance safely admitted compaction through5M and format upgrade through1M.
+Scale harness captured archive9a3fba0; test-only atomic fixture fixfd45ed5 has
+114 storage assertions and native/managed gates. No on-disk format change.
