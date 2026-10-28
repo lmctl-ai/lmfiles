@@ -1,6 +1,6 @@
 # Guarded local index/get/update correctness campaign
 
-The Lead authorized this local campaign independently of the blocked S3 test.
+The Lead authorized this local campaign independently of the S3 test (now complete).
 No cloud, AWS/admin command, credentials, real data, release or tag is involved.
 The earlier no-scale roadmap decision does not prohibit this specifically
 requested bounded correctness run. Timings and bytes/item are informational.
@@ -155,4 +155,37 @@ in the machine-readable result.
 
 Local gates:271 registry assertions,21 subprocess checks and17 disk-guard unit
 tests per gate (managed/native), plus9 pure S3-oracle tests. No AWS/admin command,
-CI dispatch, tag or release was performed. S3 live work remains separately blocked.
+CI dispatch, tag or release was performed. The separately authorized S3 run is complete; see [S3_100_TEST.md](S3_100_TEST.md).
+
+
+## E: volume-only follow-up
+
+`--volume e` selects a fresh `/mnt/e/lmfiles-scale-<unique>` directory, fixed
+**500,000,000,000 bytes free** and **150,000,000,000 bytes fixture maximum**.
+The Linux root-free minimum remains40GB as an additional safeguard. Only build,
+verify, update, claim and reopen run there. The Java worker independently refuses
+crash, recovery, doctor, compaction and format-upgrade phases on E:. Core registry
+operations still perform their ordinary writes/syncs; their success on E: establishes
+functional observations only. **9p/DrvFS is not a supported durability target.**
+See [DRVFS_LIMITATIONS.md](DRVFS_LIMITATIONS.md) for the small explicit mount probe.
+
+```sh
+python3 scripts/test-scale.py --volume e --budget 3600 \
+  --report /tmp/lmfiles-e-campaign.json
+```
+
+E: default ramp:1M,10M,50M,100M cumulative items. This run chooses a **one-hour
+wall-clock budget** rather than the permitted six-hour ceiling. Both monitors and
+workers retain the disk guards. Before starting the next size, the runner projects
+the preceding full step linearly with25% margin and stops if it cannot fit the
+remaining budget. A mid-phase deadline kills/reaps the worker and deletes the
+fixture; an incomplete size is never reported as passing. `budget_stopped` is a
+clean planned stop. Reports and logs must be outside the fixture, which is removed
+on every exit. No other E: files are inspected, altered or cleaned up.
+
+Durability-sensitive gates remain on Linux ext4: lock/stale-lock, sync policy,
+torn writes, SIGKILL recovery, compaction fault points and format2→3 atomic swap.
+The historical20M Linux kill/recovery result remains valid; maintenance admission
+was more restrictive. A separate guarded Linux follow-up attempts2M and8M sizes,
+with the same40GB/25GB hard limits. It may skip maintenance before allocating
+unsafe temporary copies. E: capacity never relaxes those Linux limits.

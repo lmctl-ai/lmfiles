@@ -1,0 +1,1 @@
+{"cleanup": "removed", "flock_exclusion": "excluded", "fsync": "returned", "kill_midwrite": "jsonl-prefix-and-torn-tail", "kill_midwrite_complete_records": 20, "mount": "/mnt/e", "rename_iterations": 400, "rename_visibility": "unexpected:2", "status": "limited", "work": "dedicated"}

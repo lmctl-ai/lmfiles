@@ -24,6 +24,9 @@ from typing import Callable, Iterable
 PHASES = ("build", "verify", "update", "claim", "reopen", "crash_prepare", "crash", "recover", "doctor", "compact", "upgrade")
 HARD_MIN_FREE = 40_000_000_000
 HARD_MAX_DIR_BYTES = 25_000_000_000
+VOLUME_PHASES = ("build", "verify", "update", "claim", "reopen")
+E_MIN_FREE = 500_000_000_000
+E_MAX_DIR = 150_000_000_000
 DEFAULT_STEPS = (1_000_000, 5_000_000, 20_000_000)
 DEFAULT_COMMAND = ["java", "-Xmx1536m", "-jar", "target/lmfiles-0.1.2-all.jar"]
 
@@ -54,8 +57,13 @@ class DiskGuard:
     """
 
     def __init__(self, work: Path, *, read_usage: Callable[[], tuple[int, int]] | None = None,
-                 min_free: int = HARD_MIN_FREE, max_dir_bytes: int = HARD_MAX_DIR_BYTES):
-        if min_free < HARD_MIN_FREE or max_dir_bytes > HARD_MAX_DIR_BYTES:
+                 min_free: int = HARD_MIN_FREE, max_dir_bytes: int = HARD_MAX_DIR_BYTES,
+                 volume: str = "linux"):
+        self.volume = volume
+        if volume not in ("linux", "e"):
+            raise ValueError("unknown volume")
+        floor, ceiling = (E_MIN_FREE, E_MAX_DIR) if volume == "e" else (HARD_MIN_FREE, HARD_MAX_DIR_BYTES)
+        if min_free < floor or max_dir_bytes > ceiling:
             raise ValueError("scale guard limits cannot be relaxed")
         self.work = Path(work)
         self.read_usage = read_usage or self._read_usage
@@ -63,7 +71,10 @@ class DiskGuard:
         self.max_dir_bytes = max_dir_bytes
 
     def _read_usage(self) -> tuple[int, int]:
-        return shutil.disk_usage("/").free, directory_bytes(self.work)
+        root_free = shutil.disk_usage("/").free
+        if root_free < HARD_MIN_FREE:
+            raise GuardViolation(dict(time=time.time(), phase="root", event="root_guard", free_bytes=root_free, dir_bytes=0, state="violation"))
+        return shutil.disk_usage(self.work if self.volume == "e" else "/").free, directory_bytes(self.work)
 
     def reading(self, phase: str, event: str) -> dict:
         free, used = self.read_usage()
@@ -147,6 +158,7 @@ class ManagedChild:
         argv = self.command + ["--scale-phase", str(self.work), phase, str(count)]
         started = time.time()
         env = os.environ.copy()
+        env["LMFILES_SCALE_VOLUME"] = self.guard.volume
         if phase == "crash":
             env["LMFILES_KILL_POINT"] = "scale_sigkill"
         self._proc = subprocess.Popen(argv, cwd=self.work, env=env, text=True,
@@ -245,12 +257,18 @@ def resolve_command(command: list[str], base: Path) -> list[str]:
 
 def main(argv: Iterable[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
+    ap.add_argument("--volume", choices=("linux", "e"), default="linux", help="E: runs volume checks only; no durability phases")
+    ap.add_argument("--budget", type=float, default=3600, help="total wall-clock seconds (1..21600)")
     ap.add_argument("--command", default=json.dumps(DEFAULT_COMMAND), help="JSON argv")
     ap.add_argument("--steps", type=parse_steps, default=list(DEFAULT_STEPS))
     ap.add_argument("--timeout", type=float, default=7200, help="per-phase timeout (1..7200 seconds)")
     ap.add_argument("--report", type=Path, default=Path.cwd() / ".lmfiles-local" / "scale-report.json")
     ap.add_argument("--progress-log", type=Path, help="external bounded child JSONL log")
     ns = ap.parse_args(argv)
+    if not 1 <= ns.budget <= 21600:
+        ap.error("--budget must be between 1 and 21600 seconds")
+    if ns.volume == "e" and ns.steps == list(DEFAULT_STEPS):
+        ns.steps = [1_000_000, 10_000_000, 50_000_000, 100_000_000]
     if not 1 <= ns.timeout <= 7200:
         ap.error("--timeout must be between 1 and 7200 seconds")
     try:
@@ -262,7 +280,7 @@ def main(argv: Iterable[str] | None = None) -> int:
     command = resolve_command(command, Path.cwd())
     report = ns.report.resolve()
     report.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="lmfiles-scale-", dir="/tmp") as directory:
+    with tempfile.TemporaryDirectory(prefix="lmfiles-scale-", dir="/mnt/e" if ns.volume == "e" else "/tmp") as directory:
         return campaign(ns, command, report, Path(directory))
 
 
@@ -272,13 +290,19 @@ def campaign(ns, command, report, work):
         raise SystemExit("--report must be outside the dedicated /tmp fixture")
     if ns.progress_log and (ns.progress_log.resolve() == work or work in ns.progress_log.resolve().parents):
         raise SystemExit("--progress-log must be outside the dedicated /tmp fixture")
+    volume = getattr(ns, "volume", "linux")
+    phases = VOLUME_PHASES if volume == "e" else PHASES
+    budget = getattr(ns, "budget", 3600)
+    deadline = time.monotonic() + budget
+    floor, ceiling = (E_MIN_FREE, E_MAX_DIR) if volume == "e" else (HARD_MIN_FREE, HARD_MAX_DIR_BYTES)
     payload = {"settings": {"command": command, "steps": ns.steps, "timeout": ns.timeout,
-                             "min_free_bytes": HARD_MIN_FREE, "max_dir_bytes": HARD_MAX_DIR_BYTES,
+                             "min_free_bytes": floor, "max_dir_bytes": ceiling, "volume": volume, "budget_seconds": budget,
+                             "root_min_free_bytes": HARD_MIN_FREE,
                              "monitor_seconds": 0.5, "worker_batch_items": 512,
-                             "work": str(work), "phases": list(PHASES)},
+                             "work": str(work), "phases": list(phases)},
                "phases": [], "guard_readings": [], "state": "running"}
     print(json.dumps(payload["settings"], sort_keys=True), flush=True)
-    guard = DiskGuard(work)
+    guard = DiskGuard(work, volume="e", min_free=floor, max_dir_bytes=ceiling) if volume == "e" else DiskGuard(work)
     current_runner: ManagedChild | None = None
     old_handlers = {}
 
@@ -291,19 +315,29 @@ def campaign(ns, command, report, work):
         old_handlers[signum] = signal.signal(signum, stop_handler)
     try:
         (work / ".lmfiles-scale-marker").write_text("lmfiles-scale-fixture-v1\n", encoding="ascii")
+        previous_seconds = previous_count = 0
         for count in ns.steps:
-            for phase in PHASES:
+            remaining = deadline - time.monotonic()
+            # Conservative admission: do not start a larger incomplete step when
+            # linear projection plus 25% exceeds the remaining budget.
+            projected = previous_seconds * count / previous_count * 1.25 if previous_count else 0
+            if remaining <= 0 or projected > remaining:
+                payload.update(state="budget_stopped", next_count=count, projected_next_seconds=projected)
+                return 0
+            step_started = time.monotonic()
+            for phase in phases:
                 reading = guard.check(phase, "phase-start")
-                current_runner = ManagedChild(command, work, guard, timeout=ns.timeout, stdout_log=ns.progress_log)
+                current_runner = ManagedChild(command, work, guard, timeout=max(.01,min(ns.timeout, deadline-time.monotonic())), stdout_log=ns.progress_log)
                 payload["phases"].append(current_runner.run(phase, count))
                 payload["guard_readings"].extend(current_runner.readings)
                 checkpoint=report.with_suffix(report.suffix+".tmp")
                 checkpoint.write_text(json.dumps(payload,indent=2)+"\n",encoding="utf-8")
                 checkpoint.replace(report)
+            previous_seconds, previous_count = time.monotonic()-step_started, count
         payload["state"] = "ok"
         return 0
     except (GuardViolation, TimeoutError, subprocess.SubprocessError, OSError, PhaseFailure) as exc:
-        payload["state"] = "failed"
+        payload["state"] = "budget_stopped" if isinstance(exc, TimeoutError) and time.monotonic() >= deadline else "failed"
         payload["error"] = str(exc)
         if isinstance(exc, GuardViolation):
             payload["state"] = "guard_aborted"
@@ -315,10 +349,10 @@ def campaign(ns, command, report, work):
             payload["phases"].append(exc.result)
         elif current_runner is not None and current_runner.phase is not None:
             payload["phases"].append({"phase": current_runner.phase, "count": current_runner.count,
-                                      "state": "failed", "error": str(exc),
+                                      "state": payload["state"], "error": str(exc),
                                       "stdout": current_runner.records,
                                       "guard_readings": current_runner.readings})
-        return 1
+        return 0 if payload["state"] == "budget_stopped" else 1
     except KeyboardInterrupt:
         payload["state"] = "interrupted"
         return 130

@@ -21,3 +21,7 @@ Missing paths are not automatically marked gone. See docs/SCAN.md.
 Scalars/JSON and Registry/Snapshot/Cursor/WriteBatch/Rows handles only. Memory
 budget default256MiB bounds records/pages/batches/cache/VM arena, not exact RSS.
 Exact contracts: generated schema, docs/API.md and docs/FORMAT_UPGRADE.md.
+
+Durability-sensitive registries require a supported local Linux filesystem in
+current qualification. E:9p/DrvFS is volume-correctness-only and unsupported for
+durability. See docs/DRVFS_LIMITATIONS.md; a returning fsync is not a guarantee.

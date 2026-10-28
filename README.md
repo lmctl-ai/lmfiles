@@ -149,3 +149,7 @@ The separately authorized [guarded local index/get/update correctness run](docs/
 passed through20M items, with mandatory cleanup verified. Maintenance headroom
 limited compaction to5M and format2→3 upgrade to1M. Numbers are informational;
 the hard40GB-free/25GB-directory guards remain mandatory.
+
+The optional [E: volume checks](docs/DRVFS_LIMITATIONS.md) use guarded synthetic
+fixtures only. 9p/DrvFS is **not a supported durability target**; crash-safety
+checks stay on Linux ext4.

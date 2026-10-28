@@ -20,6 +20,55 @@ spec.loader.exec_module(scale)
 
 
 class ScaleGuardTests(unittest.TestCase):
+    def test_e_campaign_executes_only_volume_phases_and_cleans(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td); work=Path(tempfile.mkdtemp(prefix="lmfiles-scale-")); report=root/'report.json'
+            ns=type('Args',(),{'steps':[100], 'timeout':5, 'progress_log':None, 'volume':'e', 'budget':30})()
+            worker=root/'worker.py'
+            worker.write_text("import json,os; assert os.environ['LMFILES_SCALE_VOLUME']=='e'; print(json.dumps({'event':'result','status':'ok'}))")
+            guard_type=scale.DiskGuard
+            def guard(path, **kwargs):
+                return guard_type(path, read_usage=lambda:(scale.E_MIN_FREE,0), **kwargs)
+            with mock.patch.object(scale,'DiskGuard',guard), redirect_stdout(StringIO()):
+                self.assertEqual(scale.campaign(ns,[sys.executable,str(worker)],report,work),0)
+            result=json.loads(report.read_text())
+            self.assertEqual([p['phase'] for p in result['phases']],list(scale.VOLUME_PHASES))
+            self.assertEqual(result['settings']['min_free_bytes'],scale.E_MIN_FREE)
+            self.assertEqual(result['settings']['max_dir_bytes'],scale.E_MAX_DIR)
+            self.assertTrue(result['cleanup_verified'])
+
+    def test_e_limits_cannot_be_relaxed(self):
+        with tempfile.TemporaryDirectory() as td:
+            for floor, cap in [(scale.E_MIN_FREE-1, scale.E_MAX_DIR), (scale.E_MIN_FREE, scale.E_MAX_DIR+1)]:
+                with self.assertRaises(ValueError):
+                    scale.DiskGuard(Path(td), volume="e", min_free=floor, max_dir_bytes=cap)
+
+    def test_e_space_and_size_guards(self):
+        for free, used in [(scale.E_MIN_FREE-1, 0), (scale.E_MIN_FREE, scale.E_MAX_DIR+1)]:
+            guard=scale.DiskGuard(Path('/unused'), volume="e", min_free=scale.E_MIN_FREE,
+                                  max_dir_bytes=scale.E_MAX_DIR, read_usage=lambda: (free,used))
+            with self.assertRaises(scale.GuardViolation): guard.check('build','test')
+
+    def test_e_also_guards_root(self):
+        guard=scale.DiskGuard(Path('/unused'), volume="e", min_free=scale.E_MIN_FREE, max_dir_bytes=scale.E_MAX_DIR)
+        with mock.patch.object(scale.shutil, 'disk_usage', return_value=type('Usage',(),{'free':scale.HARD_MIN_FREE-1})()):
+            with self.assertRaises(scale.GuardViolation): guard.check('build','test')
+
+    def test_e_never_selects_durability_phases(self):
+        self.assertEqual(scale.VOLUME_PHASES, ('build','verify','update','claim','reopen'))
+        self.assertFalse(set(scale.VOLUME_PHASES) & {'crash','recover','doctor','compact','upgrade'})
+
+    def test_budget_stop_cleans_fixture(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td); work=Path(tempfile.mkdtemp(prefix="lmfiles-scale-")); report=root/'report.json'
+            ns=type('Args',(),{'steps':[100], 'timeout':5, 'progress_log':None, 'budget':-1})()
+            with redirect_stdout(StringIO()):
+                self.assertEqual(scale.campaign(ns,[sys.executable],report,work),0)
+            result=json.loads(report.read_text())
+            self.assertEqual(result['state'],'budget_stopped')
+            self.assertTrue(result['cleanup_verified'])
+            self.assertEqual(result['phases'],[])
+
     def test_relative_executable_resolves_before_fixture_cwd(self):
         with tempfile.TemporaryDirectory() as directory:
             base=Path(directory);program=base/"tool";program.write_text("#!/bin/sh\nexit 0\n");program.chmod(0o755)

@@ -21,3 +21,7 @@
 - [../docs/LOCAL_SCALE_TEST.md](../docs/LOCAL_SCALE_TEST.md): explicitly authorized local guarded correctness ramp, independent of S3.
 
 - [../docs/LOCAL_SCALE_RESULTS.json](../docs/LOCAL_SCALE_RESULTS.json): completed guarded local campaign counts, maintenance skips and cleanup evidence.
+
+- [../docs/DRVFS_LIMITATIONS.md](../docs/DRVFS_LIMITATIONS.md): E: mount probe observations; volume correctness only, unsupported durability.
+
+- [../docs/DRVFS_PROBE_RESULTS.json](../docs/DRVFS_PROBE_RESULTS.json): sampled mount behavior; a concurrent rename reader observed a missing destination.

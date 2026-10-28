@@ -38,7 +38,14 @@ Maintenance safely admitted compaction through5M and format upgrade through1M.
 Scale harness captured archive9a3fba0; test-only atomic fixture fixfd45ed5 has
 114 storage assertions and native/managed gates. No on-disk format change.
 
-Live helper tests:9; PUT correlation-audit tests:4. Full SDK loopback driver passed
+Live helper tests:11; PUT correlation-audit tests:4. Full SDK loopback driver passed
 30 rounds before live execution. New API examples pin lmaws0.1.23 and use a Linux
 process/cleanup supervisor. The live result and raw-private/public split are
 documented in docs/S3_100_TEST.md. Render sanitized chart with scripts/render-s3-results.lms.
+
+E: volume-only mode (`test-scale.py --volume e`) permits only bulk/get/update/
+subset/frontier/claim/reopen in a fresh dedicated directory. Fixed guards500GB
+free/150GB fixture plus40GB root free; default wall budget1h, maximum6h. Next-step
+admission uses prior elapsed time with25% margin. All fixtures removed. 9p/DrvFS
+is unsupported for durability; crash/lock/fsync/compaction/upgrade tests stay on
+Linux ext4. See docs/DRVFS_LIMITATIONS.md.23 safety unit tests in each gate.

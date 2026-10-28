@@ -36,8 +36,15 @@ def summarize(report):
         return max((n for n,g in steps.items() if any(r['operation']==operation and r['status']=='ok' for r in g['operations'])),default=0)
     removed=not pathlib.Path(settings['work']).exists()
     return {'state':report['state'],'scope':'Local synthetic correctness; timings and sizes informational only',
-            'guards':{'minimum_root_free_bytes':settings['min_free_bytes'],'maximum_registry_bytes':settings['max_dir_bytes'],
-                      'readings':len(all_reads),'minimum_root_free_observed':min((r['free_bytes'] for r in all_reads),default=None),
+            'volume':settings.get('volume','linux'),
+            'budget_seconds':settings.get('budget_seconds'),
+            'next_count':report.get('next_count'),
+            'projected_next_seconds':report.get('projected_next_seconds'),
+            'guards':{'minimum_volume_free_bytes':settings['min_free_bytes'],
+                      'minimum_root_free_bytes':settings.get('root_min_free_bytes',settings['min_free_bytes']),
+                      'maximum_registry_bytes':settings['max_dir_bytes'],
+                      'readings':len(all_reads),'minimum_volume_free_observed':min((r['free_bytes'] for r in all_reads),default=None),
+                      'minimum_root_free_observed':min((r['free_bytes'] for r in all_reads),default=None) if settings.get('volume','linux')=='linux' else None,
                       'maximum_registry_observed':max((r['dir_bytes'] for r in all_reads),default=None)},
             'cleanup_verified':report.get('cleanup_verified',False) and removed,'directory_independently_absent':removed,
             'largest_indexed':largest('build'),'largest_compacted':largest('compact'),'largest_upgraded':largest('upgrade'),

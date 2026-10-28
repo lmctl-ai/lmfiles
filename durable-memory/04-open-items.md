@@ -39,3 +39,7 @@ operations/doctor passed; compaction qualified through5M and format2→3 through
 Larger maintenance was skipped by conservative transient-space admission, not
 claimed as tested. Minrootfree82.33GB/maxfixture17.70GB; no hard guard violation.
 See docs/LOCAL_SCALE_RESULTS.json for exact counts and code/archive provenance.
+
+The E: follow-up is an explicitly bounded local correctness campaign, not a scale
+qualification roadmap. Volume operations only on9p/DrvFS; all durability tests
+stay on Linux ext4. No additional live/cloud run is authorized.
