@@ -13,7 +13,7 @@ file_write(".lmfiles-local/revisions/rows.json", stale.next_json(100,1048576));
 db.close();
 end _lmcode_
 savedsl(state, "build/revisions-state.dslb");
-let run = system ${dsl_cli(state)} --dsl build/revisions-state.dslb;
+let run = system ${dsl_cli(state)} --lmcode build/revisions-state.dslb;
 assert(run.code == 0);
 
 let states=read_json(".lmfiles-local/revisions/rows.json");
@@ -28,5 +28,5 @@ plot.cmd("set title 'Published revisions'; set ylabel 'items'; set style data hi
 plot.close();
 end _lmcode_
 savedsl(plot, "build/revisions-plot.dslb");
-let plotted = system ${dsl_cli(plot)} --dsl build/revisions-plot.dslb;
+let plotted = system ${dsl_cli(plot)} --lmcode build/revisions-plot.dslb;
 assert(plotted.code == 0);

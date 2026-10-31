@@ -9,7 +9,7 @@
 ## Executive Summary
 
 `lmfiles` v0.1.0 is a clean, compact (~750 LOC across 10 Java classes), zero-business-rule local file lifecycle registry built on `lmcode-java` v0.1.1 and H2 `MVStore` 2.3.232. It resolves the major architectural blockers identified in `LMSYNC_REVIEW.md`:
-- The API is strictly compliant with the `lmcode` type system (`int`, `bool`, `string`, `void` and opaque handles `Registry`, `Snapshot`, `WriteBatch`, `Cursor`, `Rows`), verified at startup by `vm.checkSchemaSignatures` and in `test.sh` by `lmscript --dsl-signatures`.
+- The API is strictly compliant with the `lmcode` type system (`int`, `bool`, `string`, `void` and opaque handles `Registry`, `Snapshot`, `WriteBatch`, `Cursor`, `Rows`), verified at startup by `vm.checkSchemaSignatures` and in `test.sh` by `lmscript --lmcode-signatures`.
 - Zero business rules, transport clients, credentials, or network calls exist in core (`strace -f -e trace=network` verifies no remote socket operations; `/proc/<pid>/maps` verifies positional `FileChannel` I/O with no `mmap`).
 - The 1,507.328 B/item measurement at 10,000 items (`15,073,280 B`) is honest and byte-for-byte reproducible (`Bench.java`).
 

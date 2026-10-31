@@ -23,7 +23,7 @@ file_write(".lmfiles-local/journal-resume/data.dat", "planned " + str(str_split(
 db.close();
 end _lmcode_
 savedsl(state, "build/journal-resume-state.dslb");
-let run = system ${dsl_cli(state)} --dsl build/journal-resume-state.dslb;
+let run = system ${dsl_cli(state)} --lmcode build/journal-resume-state.dslb;
 assert(run.code == 0);
 
 assert(read_file(".lmfiles-local/journal-resume/data.dat")=="planned 2\nconfirmed 1\nunconfirmed 1\n");
@@ -33,5 +33,5 @@ plot.cmd("set title 'Plan replay and confirmation gap'; set ylabel 'items'; set 
 plot.close();
 end _lmcode_
 savedsl(plot, "build/journal-resume-plot.dslb");
-let plotted = system ${dsl_cli(plot)} --dsl build/journal-resume-plot.dslb;
+let plotted = system ${dsl_cli(plot)} --lmcode build/journal-resume-plot.dslb;
 assert(plotted.code == 0);

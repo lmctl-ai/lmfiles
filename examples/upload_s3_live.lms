@@ -20,7 +20,7 @@ mkdir(ROOT);mkdir(ROOT+"/ledger");mkdir(ROOT+"/build");
 let STATE={catalog:{},history:[],max_skew:0,nonce:0};let phase_rows=[];let soak_rows=[];
 fn native(p,name){
  let path=ROOT+"/build/"+name+".dslb";savedsl(p,path);
- let r=system(concat(dsl_cli(p),["--dsl",path]),600000);
+ let r=system(concat(dsl_cli(p),["--lmcode",path]),600000);
  if(r.code!=0){write_file(ROOT+"/error-"+name+".txt",r.stdout+"\n"+r.stderr);}
  return r;
 }
@@ -133,7 +133,7 @@ for(i in range(0,keys.len())){
 }
 end _lmcode_
  let bytecode=ROOT+"/build/executor.dslb";savedsl(program,bytecode);
- let launcher=system(["python3",SUPERVISOR,"executor","--command",json_stringify(concat(dsl_cli(program),["--dsl",bytecode])),"--ready",ROOT+"/kill-ready","--receipts",ROOT+"/put-receipts.jsonl","--output",ROOT+"/executor-exit.json"],330000);assert(launcher.code==0,"executor supervisor failed");
+ let launcher=system(["python3",SUPERVISOR,"executor","--command",json_stringify(concat(dsl_cli(program),["--lmcode",bytecode])),"--ready",ROOT+"/kill-ready","--receipts",ROOT+"/put-receipts.jsonl","--output",ROOT+"/executor-exit.json"],330000);assert(launcher.code==0,"executor supervisor failed");
  let exit=read_json(ROOT+"/executor-exit.json");if(kill_after>0){assert(exit.killed&&exit.code==-9,"executor was not SIGKILLed at checkpoint");}
  let receipts=[];for(line in read_lines(ROOT+"/put-receipts.jsonl")){if(trim(line)!=""){receipts=concat(receipts,[json_parse(line)]);}}
  confirmations=confirmations+record_receipts(uploads,receipts,fault=="lost");

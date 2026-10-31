@@ -6,4 +6,4 @@ let p=_lmcode_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
 plot.png("docs/images/s3_live.png",960,560);plot.data("OPS",${DATA});
 plot.cmd(${"set title '"+TITLE+"';set ylabel 'Local tree operations';set yrange [0:55];set grid ytics;set style data histograms;set style fill solid 0.8;set boxwidth 0.7;plot $OPS using 2:xtic(1) lc rgb '#2563eb' notitle"});plot.close();
 end _lmcode_
-mkdir("build");savedsl(p,"build/s3-results-plot.dslb");let r=system(concat(dsl_cli(p),["--dsl","build/s3-results-plot.dslb"]),60000);assert(r.code==0);
+mkdir("build");savedsl(p,"build/s3-results-plot.dslb");let r=system(concat(dsl_cli(p),["--lmcode","build/s3-results-plot.dslb"]),60000);assert(r.code==0);

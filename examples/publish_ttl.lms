@@ -23,7 +23,7 @@ file_write(".lmfiles-local/publish-ttl/query.json", rows.next_json(10,1048576));
 rows.close(); db.close();
 end _lmcode_
 savedsl(init, "build/publish-init.dslb");
-let initialized = system(concat(dsl_cli(init), ["--dsl", "build/publish-init.dslb"]), 120000);
+let initialized = system(concat(dsl_cli(init), ["--lmcode", "build/publish-init.dslb"]), 120000);
 assert(initialized.code == 0);
 let items = read_json(ROOT + "/items.json");
 let states = read_json(ROOT + "/query.json");
@@ -46,7 +46,7 @@ for (i in range(0, 2)) {
     file_write(".lmfiles-local/publish-ttl/digest.txt", registry.instruction_digest(${LINE}));
 end _lmcode_
     savedsl(prepare,"build/publish-prepare.dslb");
-    let prepared=system(concat(dsl_cli(prepare),["--dsl","build/publish-prepare.dslb"]),120000); assert(prepared.code==0);
+    let prepared=system(concat(dsl_cli(prepare),["--lmcode","build/publish-prepare.dslb"]),120000); assert(prepared.code==0);
     # Existing lmaws second host, explicitly synthetic. This host owns no real resources.
     let transfer = _lmcode_ cli="lmaws" install="github:lmctl-ai/lmaws@latest";
     let cloud = aws.demo();
@@ -56,7 +56,7 @@ end _lmcode_
     run.cleanup();
 end _lmcode_
     savedsl(transfer,"build/publish-transfer.dslb");
-    let sent=system(concat(dsl_cli(transfer),["--dsl","build/publish-transfer.dslb"]),120000); assert(sent.code==0);
+    let sent=system(concat(dsl_cli(transfer),["--lmcode","build/publish-transfer.dslb"]),120000); assert(sent.code==0);
     # A deterministic persistent local S3-like artifact for verification of the fake job.
     assert(write_file(ROOT + "/fake-bucket/" + KEY, BODY));
     if (!(MODE == "uncertain" && i == 0)) {
@@ -66,7 +66,7 @@ end _lmcode_
       registry.log_append(${RESULTS}, ${RECEIPT}, "{}");
 end _lmcode_
       savedsl(log,"build/publish-log.dslb");
-      let logged=system(concat(dsl_cli(log),["--dsl","build/publish-log.dslb"]),120000); assert(logged.code==0);
+      let logged=system(concat(dsl_cli(log),["--lmcode","build/publish-log.dslb"]),120000); assert(logged.code==0);
       confirmed=confirmed+1;
     }
   }
@@ -78,7 +78,7 @@ registry.unconfirmed(${PLAN},${RESULTS},".lmfiles-local/publish-ttl/unconfirmed.
 db.close();
 end _lmcode_
 savedsl(replay,"build/publish-replay.dslb");
-let replayed=system(concat(dsl_cli(replay),["--dsl","build/publish-replay.dslb"]),120000); assert(replayed.code==0);
+let replayed=system(concat(dsl_cli(replay),["--lmcode","build/publish-replay.dslb"]),120000); assert(replayed.code==0);
 write_file(ROOT+"/report.json",json_stringify({selected:selected,confirmed:confirmed,unconfirmed:selected-confirmed,mode:MODE,real_requests:0}));
 let DATA="selected "+str(selected)+"\nconfirmed "+str(confirmed)+"\nunconfirmed "+str(selected-confirmed)+"\n";
 let plot = _lmcode_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
@@ -88,6 +88,6 @@ plot.cmd("set title 'Local fake publication: receipts decide recorded state'; se
 plot.close();
 end _lmcode_
 savedsl(plot,"build/publish-plot.dslb");
-let plotted=system(concat(dsl_cli(plot),["--dsl","build/publish-plot.dslb"]),120000); assert(plotted.code==0);
+let plotted=system(concat(dsl_cli(plot),["--lmcode","build/publish-plot.dslb"]),120000); assert(plotted.code==0);
 println("selected="+str(selected)+", confirmed="+str(confirmed)+", unconfirmed="+str(selected-confirmed));
 println("estimated cost: $0.00 (local fakes only)");

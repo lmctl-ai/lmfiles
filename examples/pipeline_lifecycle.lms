@@ -6,7 +6,7 @@ mkdir(ROOT); mkdir(ROOT+"/fake-s3"); mkdir("build"); mkdir("images");
 let DB = ROOT+"/state.mv"; let PLAN=ROOT+"/plan.jsonl"; let LOG=ROOT+"/results.jsonl";
 fn execute(p, name) {
   let path="build/pipeline-"+name+".dslb"; savedsl(p,path);
-  let r=system(concat(dsl_cli(p),["--dsl",path]),30000); assert(r.code==0);
+  let r=system(concat(dsl_cli(p),["--lmcode",path]),30000); assert(r.code==0);
 }
 let LOGS=file_exists(PLAN)&&file_exists(LOG);
 let init=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";

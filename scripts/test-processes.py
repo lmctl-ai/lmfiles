@@ -60,7 +60,7 @@ def main() -> int:
 
         version = call("--version")
         assert version.stdout.startswith("lmfiles "), version.stdout
-        schema = call("--dsl-schema", "--json")
+        schema = call("--lmcode-schema", "--json")
         parsed = json.loads(schema.stdout)
         assert parsed.get("dsl.schema") == 2 and parsed.get("name") == "lmfiles"
         passed += 2

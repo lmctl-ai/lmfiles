@@ -80,7 +80,7 @@ never decides that an old record needs refreshing.
 
 The context is `registry`; structured inputs/receipts are JSON strings, with opaque
 `Registry`, `Snapshot`, `Cursor`, `WriteBatch` and `Rows` handles. Generated exact
-signatures: [schema](schema/lmfiles.dsl.json), `lmfiles --dsl-signatures`.
+signatures: [schema](schema/lmfiles.dsl.json), `lmfiles --lmcode-signatures`.
 The implemented subset and JSON contracts are in [docs/API.md](docs/API.md).
 
 ```text

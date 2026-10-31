@@ -16,7 +16,7 @@ file_write(".lmfiles-local/claims/data.dat", "worker-a " + str(ac) + "\nworker-b
 db.close();
 end _lmcode_
 savedsl(state, "build/claims-state.dslb");
-let run = system ${dsl_cli(state)} --dsl build/claims-state.dslb;
+let run = system ${dsl_cli(state)} --lmcode build/claims-state.dslb;
 assert(run.code == 0);
 
 assert(read_file(".lmfiles-local/claims/data.dat")=="worker-a 3\nworker-b 3\nremainder 4\n");
@@ -26,5 +26,5 @@ plot.cmd("set title 'Claimed lifecycle work'; set ylabel 'items'; set style data
 plot.close();
 end _lmcode_
 savedsl(plot, "build/claims-plot.dslb");
-let plotted = system ${dsl_cli(plot)} --dsl build/claims-plot.dslb;
+let plotted = system ${dsl_cli(plot)} --lmcode build/claims-plot.dslb;
 assert(plotted.code == 0);

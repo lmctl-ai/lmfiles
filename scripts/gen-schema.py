@@ -6,8 +6,8 @@ from pathlib import Path
 root=Path(__file__).resolve().parents[1]
 ap=argparse.ArgumentParser(); ap.add_argument('host', nargs='?', default=str(root/'target/lmfiles'))
 ap.add_argument('--check', action='store_true'); args=ap.parse_args()
-command=[args.host,'--dsl-schema','--json']
-if args.host.endswith('.jar'): command=['java','-jar',args.host,'--dsl-schema','--json']
+command=[args.host,'--lmcode-schema','--json']
+if args.host.endswith('.jar'): command=['java','-jar',args.host,'--lmcode-schema','--json']
 raw=subprocess.check_output(command, timeout=30)
 obj=json.loads(raw)
 if obj.get('name')!='lmfiles' or obj.get('dsl.schema')!=2: raise SystemExit('unexpected lmfiles schema')

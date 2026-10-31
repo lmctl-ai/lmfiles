@@ -17,7 +17,7 @@ file_write(".lmfiles-local/frontier/data.dat", "fetched 20\npublished 14\npendin
 db.close();
 end _lmcode_
 savedsl(state, "build/frontier-state.dslb");
-let run = system ${dsl_cli(state)} --dsl build/frontier-state.dslb;
+let run = system ${dsl_cli(state)} --lmcode build/frontier-state.dslb;
 assert(run.code == 0);
 
 assert(read_file(".lmfiles-local/frontier/data.dat")=="fetched 20\npublished 14\npending 6\n");
@@ -27,5 +27,5 @@ plot.cmd("set title 'Lifecycle frontier'; set ylabel 'items'; set style data his
 plot.close();
 end _lmcode_
 savedsl(plot, "build/frontier-plot.dslb");
-let plotted = system ${dsl_cli(plot)} --dsl build/frontier-plot.dslb;
+let plotted = system ${dsl_cli(plot)} --lmcode build/frontier-plot.dslb;
 assert(plotted.code == 0);

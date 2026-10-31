@@ -14,7 +14,7 @@ end _lmcode_
 let cli=dsl_cli(host);
 let version=system(concat(cli,["--version"]),30000);
 assert(version.code==0 && trim(version.stdout)=="lmaws 0.1.23","the pinned lmaws v0.1.23 executable is required on PATH");
-let result=system(concat(cli,["--dsl-schema","--json"]),30000);assert(result.code==0);
+let result=system(concat(cli,["--lmcode-schema","--json"]),30000);assert(result.code==0);
 let schema=json_parse(result.stdout);let methods=schema.types.Cloud.methods;
 let missing=[];
 # These exact gaps are also documented in lmaws/docs/LMSYNC_DESIGN.md.

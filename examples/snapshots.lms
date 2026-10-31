@@ -15,7 +15,7 @@ file_write(".lmfiles-local/snapshots/data.dat", "snapshot " + str(oldrows.len())
 old.close(); current.close(); current_snap.close(); snap.close(); db.close();
 end _lmcode_
 savedsl(state, "build/snapshots-state.dslb");
-let run = system ${dsl_cli(state)} --dsl build/snapshots-state.dslb;
+let run = system ${dsl_cli(state)} --lmcode build/snapshots-state.dslb;
 assert(run.code == 0);
 
 assert(read_file(".lmfiles-local/snapshots/data.dat")=="snapshot 10\ncurrent 15\n");
@@ -25,5 +25,5 @@ plot.cmd("set title 'Snapshot versus current registry'; set ylabel 'items'; set 
 plot.close();
 end _lmcode_
 savedsl(plot, "build/snapshots-plot.dslb");
-let plotted = system ${dsl_cli(plot)} --dsl build/snapshots-plot.dslb;
+let plotted = system ${dsl_cli(plot)} --lmcode build/snapshots-plot.dslb;
 assert(plotted.code == 0);

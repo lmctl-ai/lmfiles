@@ -21,18 +21,20 @@ else
   host=("$binary")
 fi
 
+python3 scripts/check-host-flags.py schema/lmfiles.dsl.json "${host[@]}"
+
 schema_file=schema/lmfiles.dsl.json
 schema_tmp=$(mktemp)
 trap 'rm -f "$schema_tmp"' EXIT
-"${host[@]}" --dsl-schema --json > "$schema_tmp"
+"${host[@]}" --lmcode-schema --json > "$schema_tmp"
 cmp -s "$schema_tmp" "$schema_file" || { echo "generated schema is stale" >&2; exit 1; }
 python3 scripts/verify-deps.py
 run 30 python3 scripts/test-s3-oracle.py
 run 30 python3 scripts/test-s3-live-oracle.py
 run 30 python3 scripts/test-s3-live-ledger-audit.py
 run 30 python3 scripts/test-scale-guard.py
-"${host[@]}" --dsl-signatures > "$schema_tmp.signatures"
-lmscript --dsl-signatures "$schema_file" > "$schema_tmp.expected"
+"${host[@]}" --lmcode-signatures > "$schema_tmp.signatures"
+lmscript --lmcode-signatures "$schema_file" > "$schema_tmp.expected"
 diff -u "$schema_tmp.expected" "$schema_tmp.signatures"
 "${host[@]}" --version | grep -q '^lmfiles 0\.1\.2$'
 "${host[@]}" --notices | grep -q 'Lattice Systems LLC'
@@ -67,7 +69,7 @@ body='let p = _lmcode_ schema='+json.dumps(str(Path.cwd()/'schema/lmfiles.dsl.js
 (work/'scan.lms').write_text(body)
 PYSCAN
 run 30 lmscript "$fixture/scan.lms"
-run 30 "${host[@]}" --dsl "$fixture/scan.dslb"
+run 30 "${host[@]}" --lmcode "$fixture/scan.dslb"
 run 30 "${host[@]}" --request "$fixture/dsl-scan.mv" scan "$fixture/dsl-scan" '{}' > "$fixture/scan-cli.json"
 python3 - "$fixture" <<'PYSCANRESULT'
 import json,sys
@@ -106,7 +108,7 @@ program='let p = _lmcode_ schema='+json.dumps(schema)+';\nlet values = str_list(
 (work/'memory.lms').write_text(program,encoding='utf-8')
 PYMEMORY
 run 30 lmscript "$fixture/memory.lms"
-if LMFILES_MAX_MEMORY_MB=1 "${host[@]}" --dsl "$fixture/memory.dslb" >"$fixture/memory.json" 2>"$fixture/memory.err"; then
+if LMFILES_MAX_MEMORY_MB=1 "${host[@]}" --lmcode "$fixture/memory.dslb" >"$fixture/memory.json" 2>"$fixture/memory.err"; then
   echo 'runaway allocation was accepted' >&2; exit 1
 fi
 grep -q 'LMFILES_MAX_MEMORY_MB' "$fixture/memory.err"
@@ -120,7 +122,7 @@ source='let p = _lmcode_ schema='+json.dumps(schema)+';\nregistry.item_upsert("{
 (work/'root.lms').write_text(source,encoding='utf-8')
 PYROOT
 run 30 lmscript "$fixture/root.lms"
-if "${host[@]}" --dsl "$fixture/root.dslb" >"$fixture/root.json"; then
+if "${host[@]}" --lmcode "$fixture/root.dslb" >"$fixture/root.json"; then
  echo 'root registry accepted an instance method' >&2; exit 1
 fi
 grep -q 'requires an open Registry handle' "$fixture/root.json"
@@ -138,7 +140,7 @@ program+='end _lmcode_\nsavedsl(p,'+json.dumps((work/'caches.dslb').as_posix())+
 (work/'caches.lms').write_text(program,encoding='utf-8')
 PYCACHES
 run 30 lmscript "$fixture/caches.lms"
-if LMFILES_MAX_MEMORY_MB=2 "${host[@]}" --dsl "$fixture/caches.dslb" >"$fixture/caches.json" 2>"$fixture/caches.err"; then
+if LMFILES_MAX_MEMORY_MB=2 "${host[@]}" --lmcode "$fixture/caches.dslb" >"$fixture/caches.json" 2>"$fixture/caches.err"; then
  echo 'store caches escaped the VM memory budget' >&2; exit 1
 fi
 grep -q 'LMFILES_MAX_MEMORY_MB' "$fixture/caches.err"

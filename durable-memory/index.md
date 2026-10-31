@@ -29,3 +29,12 @@
 - [../docs/DRVFS_VOLUME_RESULTS.json](../docs/DRVFS_VOLUME_RESULTS.json): E:1M volume correctness passed; budget stopped before10M; cleanup verified.
 
 - [../docs/EXT4_FOLLOWUP_RESULTS.json](../docs/EXT4_FOLLOWUP_RESULTS.json):2M Linux correctness/durability/upgrade passed; budget stop before8M; cleanup verified.
+
+## Host flag cutover
+
+Only --lmcode, --lmcode-schema and --lmcode-signatures are accepted. The normal
+gate rejects all retired spellings before opening input paths or creating state.
+The SDK archive is refreshed through sync-sdk.py from Java main 3ff5ca5e; schema
+bytes, DSLB magic and .dslb paths are preserved. Managed storage/process and
+compiler execution gates pass with the mono-main compiler. Optional publication
+gallery execution still requires updated AWS/plot dependencies.
