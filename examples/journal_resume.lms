@@ -3,7 +3,7 @@ mkdir(".lmfiles-local"); mkdir(".lmfiles-local/journal-resume"); mkdir("images")
 if (file_exists(".lmfiles-local/journal-resume/state.mv")) { remove_file(".lmfiles-local/journal-resume/state.mv"); }
 if (file_exists(".lmfiles-local/journal-resume/plan.jsonl")) { remove_file(".lmfiles-local/journal-resume/plan.jsonl"); }
 if (file_exists(".lmfiles-local/journal-resume/results.jsonl")) { remove_file(".lmfiles-local/journal-resume/results.jsonl"); }
-let state = _lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
+let state = _lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@v0.1.3";
 let db = registry.open(".lmfiles-local/journal-resume/state.mv", "journal", "{}");
 db.item_upsert("{\"id\":\"journal-1\"}", "{\"source\":\"synthetic\"}");
 db.item_upsert("{\"id\":\"journal-2\"}", "{\"source\":\"synthetic\"}");
@@ -22,9 +22,9 @@ db.apply_records(".lmfiles-local/journal-resume/plan.jsonl", ".lmfiles-local/jou
 file_write(".lmfiles-local/journal-resume/data.dat", "planned " + str(str_split(str_trim(file_read(".lmfiles-local/journal-resume/plan.jsonl")), "\n").len()) + "\nconfirmed " + str(str_split(str_trim(file_read(".lmfiles-local/journal-resume/results.jsonl")), "\n").len()) + "\nunconfirmed " + str(pending_count) + "\n");
 db.close();
 end _lmcode_
-savedsl(state, "build/journal-resume-state.dslb");
-let run = system ${dsl_cli(state)} --lmcode build/journal-resume-state.dslb;
-assert(run.code == 0);
+
+let run = run_lmcode(state); assert(run.ok, json_stringify(run));
+assert(run.ok);
 
 assert(read_file(".lmfiles-local/journal-resume/data.dat")=="planned 2\nconfirmed 1\nunconfirmed 1\n");
 let plot = _lmcode_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
@@ -32,6 +32,6 @@ plot.png("images/journal_resume.png", 820, 520);
 plot.cmd("set title 'Plan replay and confirmation gap'; set ylabel 'items'; set style data histograms; set style fill solid 0.8; set datafile separator ' '; set yrange [0:*]; plot '.lmfiles-local/journal-resume/data.dat' using 2:xtic(1) title 'journal state'");
 plot.close();
 end _lmcode_
-savedsl(plot, "build/journal-resume-plot.dslb");
-let plotted = system ${dsl_cli(plot)} --lmcode build/journal-resume-plot.dslb;
-assert(plotted.code == 0);
+
+let plotted = run_lmcode(plot); assert(plotted.ok, json_stringify(plotted));
+assert(plotted.ok);

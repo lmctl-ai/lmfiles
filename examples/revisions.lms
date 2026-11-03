@@ -1,7 +1,7 @@
 # Synthetic revision tracking: three published records become stale after a new observation.
 mkdir(".lmfiles-local"); mkdir(".lmfiles-local/revisions"); mkdir("images"); mkdir("build");
 if (file_exists(".lmfiles-local/revisions/state.mv")) { remove_file(".lmfiles-local/revisions/state.mv"); }
-let state = _lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
+let state = _lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@v0.1.3";
 let db = registry.open(".lmfiles-local/revisions/state.mv", "revisions", "{}");
 for (i in range(0, 10)) {
   db.item_upsert("{\"id\":\"case-" + str(i) + "\"}", "{\"source\":\"synthetic\",\"content_hash\":\"source-1\"}");
@@ -12,9 +12,9 @@ let stale = db.query_subset("site", "[\"1\",\"2\",\"3\",\"4\",\"5\",\"6\",\"7\",
 file_write(".lmfiles-local/revisions/rows.json", stale.next_json(100,1048576));
 db.close();
 end _lmcode_
-savedsl(state, "build/revisions-state.dslb");
-let run = system ${dsl_cli(state)} --lmcode build/revisions-state.dslb;
-assert(run.code == 0);
+
+let run = run_lmcode(state); assert(run.ok, json_stringify(run));
+assert(run.ok);
 
 let states=read_json(".lmfiles-local/revisions/rows.json");
 let changed=0; let current=0;
@@ -27,6 +27,6 @@ plot.png("images/revisions.png", 820, 520);
 plot.cmd("set title 'Published revisions'; set ylabel 'items'; set style data histograms; set style fill solid 0.8; set datafile separator ' '; set yrange [0:*]; plot '.lmfiles-local/revisions/data.dat' using 2:xtic(1) title 'registry count'");
 plot.close();
 end _lmcode_
-savedsl(plot, "build/revisions-plot.dslb");
-let plotted = system ${dsl_cli(plot)} --lmcode build/revisions-plot.dslb;
-assert(plotted.code == 0);
+
+let plotted = run_lmcode(plot); assert(plotted.ok, json_stringify(plotted));
+assert(plotted.ok);

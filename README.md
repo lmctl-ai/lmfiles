@@ -26,9 +26,10 @@ executor. Confirmed journal receipts advance each user-defined stage. Rerun afte
 
 ## Build and run
 
-Versions **0.1.0 through0.1.2 are released**. This follow-up changes functional
-tests and documentation; it does not tag or release. README pairings use existing
-released APIs and install each host from `github:lmctl-ai/<name>@latest`.
+The host accepts the current lmcode invocation protocol. Version **0.1.3** is
+created by this repository's CI only after the five native platform lanes pass
+on a main push. No manual tag or release step is required. Host integrations
+should pin `github:lmctl-ai/lmfiles@v0.1.3`.
 All inputs and pictures are synthetic; transfer examples remain local fixtures and the upload
 executor remains a local fake. The acceptance bar is deterministic correctness,
 not a large-tree or upload-performance tier. Performance and scale measurement
@@ -83,6 +84,12 @@ The context is `registry`; structured inputs/receipts are JSON strings, with opa
 signatures: [schema](schema/lmfiles.dsl.json), `lmfiles --lmcode-signatures`.
 The implemented subset and JSON contracts are in [docs/API.md](docs/API.md).
 
+The host command surface is `lmfiles --lmcode FILE` (repeatable),
+`--lmcode-schema [--json]`, and `--lmcode-signatures`. Invocation manifests are
+validated before a registry opens; manifest dry mode skips host and standard
+file effects. Successful calls return one terminal frame, with ordered per-part
+results for builders. Retired schema and builder flags are refused.
+
 ```text
 let db = registry.open("state.mv", "my-job", "{}");
 let item = db.item_upsert("{\"id\":\"synthetic-law\"}", "{}");
@@ -90,14 +97,13 @@ let item = db.item_upsert("{\"id\":\"synthetic-law\"}", "{}");
 db.close();
 ```
 
-`LMFILES_MAX_MEMORY_MB` is a positive whole number of MiB (default 256).
-VM allocations and bounded host records/pages/batches enforce this budget;
-MVStore cache defaults to 8 MiB, is charged to the VM on each open, and cannot
-exceed half the configured budget.
-The JVM managed launcher also caps its heap. Native images reserve 4 GiB address
-space with a 3 GiB runtime heap ceiling; the gate exercises the host under a
-6 GiB virtual-address limit. The budget is an application allocation bound, not
-an exact process RSS quota; native runtime/cache overhead is reported separately.
+`LMFILES_MAX_MEMORY_MB` is an optional explicit whole-MiB memory limit. When set,
+VM allocations and the existing record/page/batch checks enforce it. MVStore
+cache defaults to 8 MiB and is charged to the VM when a store opens. Without the
+environment variable, the host does not impose a VM-wide default memory or
+instruction budget. Native image builds retain their runtime heap and address
+space configuration; those are platform build settings rather than lmcode
+result/output limits.
 
 ## Durability and limits
 

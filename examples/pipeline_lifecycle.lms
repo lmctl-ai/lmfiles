@@ -5,11 +5,10 @@ let ROOT = ".lmfiles-local/pipeline";
 mkdir(ROOT); mkdir(ROOT+"/fake-s3"); mkdir("build"); mkdir("images");
 let DB = ROOT+"/state.mv"; let PLAN=ROOT+"/plan.jsonl"; let LOG=ROOT+"/results.jsonl";
 fn execute(p, name) {
-  let path="build/pipeline-"+name+".dslb"; savedsl(p,path);
-  let r=system(concat(dsl_cli(p),["--lmcode",path]),30000); assert(r.code==0);
+  let r=run_lmcode(p); assert(r.ok,json_stringify(r));
 }
 let LOGS=file_exists(PLAN)&&file_exists(LOG);
-let init=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
+let init=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@v0.1.3";
 let db=registry.open(${DB},"pipeline","{}");
 if (${LOGS}) { db.apply_records(${PLAN},${LOG},"{}"); }
 file_write(${ROOT+"/item.json"},db.item_upsert("{\"id\":\"synthetic-law\"}","{}"));
@@ -20,7 +19,7 @@ let item=read_json(ROOT+"/item.json"); let ITEM=item.item; let REV=item.revision
 let counts=[];
 for (stage in ["fetched","cleaned","published"]) {
   let selector=json_stringify({stage:stage,namespace:"pipeline",projection:"last_success"});
-  let query=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
+  let query=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@v0.1.3";
 let db=registry.open(${DB},"pipeline","{}");
 let rows=db.query_subset("pipeline",${json_stringify([ITEM])},${selector});
 file_write(${ROOT+"/query.json"},rows.next_json(1,1048576)); rows.close(); db.close();
@@ -34,7 +33,7 @@ end _lmcode_
     let destination=stage=="fetched" ? ROOT+"/fetched.txt" : (stage=="cleaned" ? ROOT+"/cleaned.txt" : ROOT+"/fake-s3/law.txt");
     let instruction={v:1,kind:"instruction",job:"pipeline",op:stage+"-"+ITEM+"-"+REV,payload:{verb:stage,item:ITEM,stage:stage,target:"pipeline",source_revision:REV,record_projection:"record",args:{path:destination}}};
     let LINE=json_stringify(instruction);
-    let prepare=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
+    let prepare=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@v0.1.3";
 registry.log_append(${PLAN},${LINE},"{}");
 file_write(${ROOT+"/digest.txt"},registry.instruction_digest(${LINE}));
 end _lmcode_
@@ -61,7 +60,7 @@ end _lmcode_
     let body=read_file(destination);
     let projection={kind:"record",item:ITEM,stage:stage,target:"pipeline",status:"ok",source_revision:REV,metadata:{path:destination,sha256:sha256(body),size:str(body.len()),synthetic:true}};
     let RECEIPT=json_stringify({v:1,kind:"result",job:"pipeline",op:instruction.op,result_id:instruction.op+"-confirmed",completes_instruction:true,payload:{instruction_digest:read_file(ROOT+"/digest.txt"),confirmed:true,projection:projection}});
-    let record=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
+    let record=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@v0.1.3";
 registry.log_append(${LOG},${RECEIPT},"{}");
 let db=registry.open(${DB},"pipeline","{}"); db.apply_records(${PLAN},${LOG},"{}"); db.close();
 end _lmcode_
@@ -69,7 +68,7 @@ end _lmcode_
   }
   counts=concat(counts,[count]);
 }
-let finish=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
+let finish=_lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@v0.1.3";
 registry.unconfirmed(${PLAN},${LOG},${ROOT+"/unconfirmed.jsonl"});
 end _lmcode_
 execute(finish,"finish");

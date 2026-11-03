@@ -1,11 +1,12 @@
 name: ci
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 env:
   PYTHONUTF8: '1'
-  LMFILES_MAX_MEMORY_MB: '256'
 
 permissions:
   contents: read
@@ -52,8 +53,10 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 24
-      - name: Install pinned lmscript compiler
-        run: npm install -g @lmctl-ai/lmctl@0.2.420
+      - name: Install pinned lmcode compiler
+        run: |
+          npm install --prefix "$RUNNER_TEMP/lmctl-compiler" @lmctl-ai/lmctl@0.2.458
+          echo "$RUNNER_TEMP/lmctl-compiler/node_modules/.bin" >> "$GITHUB_PATH"
       - name: Managed build and local gate
         run: timeout 1800 bash test.sh
       - name: Native build
@@ -76,22 +79,41 @@ jobs:
           if-no-files-found: error
 
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: test
     runs-on: ubuntu-22.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           path: dist
           merge-multiple: true
-      - name: Publish the five tested binaries
+      - name: Publish the five tested binaries from this green main commit
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          version="v$(python3 -c 'import xml.etree.ElementTree as ET; r=ET.parse("pom.xml").getroot(); print(r.find("{http://maven.apache.org/POM/4.0.0}version").text)')"
           cd dist
           test "$(find . -maxdepth 1 -type f -name 'lmfiles-*' | wc -l)" -eq 5
           sha256sum lmfiles-* > SHA256SUMS
-          timeout 180 gh release create "$GITHUB_REF_NAME" lmfiles-* SHA256SUMS --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --notes 'One native executable per platform; Java is not required. Local-only file lifecycle registry (no network access). Linux requires glibc 2.35 or newer.'
+          if gh release view "$version" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            object="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$version" --jq '.object.type+":"+.object.sha')"
+            if [[ "$object" == tag:* ]]; then
+              tag_object="${object#tag:}"
+              object="commit:$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$tag_object" --jq '.object.sha')"
+            fi
+            test "$object" = "commit:$GITHUB_SHA"
+            assets="$(gh release view "$version" --repo "$GITHUB_REPOSITORY" --json assets --jq '[.assets[].name] | sort | join(",")')"
+            test "$assets" = 'SHA256SUMS,lmfiles-linux-arm64,lmfiles-linux-x64,lmfiles-macos-arm64,lmfiles-macos-x64,lmfiles-windows-x64.exe'
+            verify_dir="$(mktemp -d)"
+            trap 'rm -rf "$verify_dir"' EXIT
+            gh release download "$version" --repo "$GITHUB_REPOSITORY" --dir "$verify_dir"
+            (cd "$verify_dir" && sha256sum -c SHA256SUMS)
+          else
+            gh release create "$version" lmfiles-* SHA256SUMS --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$version" --notes 'One native executable per platform; Java is not required. Local-only file lifecycle registry (no network access). Linux requires glibc 2.35 or newer.'
+          fi

@@ -1,7 +1,7 @@
 # Synthetic frontier: 20 fetched records, 14 cleaned records, six pending.
 mkdir(".lmfiles-local"); mkdir(".lmfiles-local/frontier"); mkdir("images"); mkdir("build");
 if (file_exists(".lmfiles-local/frontier/state.mv")) { remove_file(".lmfiles-local/frontier/state.mv"); }
-let state = _lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
+let state = _lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@v0.1.3";
 let db = registry.open(".lmfiles-local/frontier/state.mv", "frontier", "{}");
 for (i in range(0, 20)) {
   db.item_upsert("{\"id\":\"law-" + str(i) + "\"}", "{\"source\":\"synthetic\"}");
@@ -16,9 +16,9 @@ let rows = pending.rows(100, 1048576);
 file_write(".lmfiles-local/frontier/data.dat", "fetched 20\npublished 14\npending " + str(rows.len()) + "\n");
 db.close();
 end _lmcode_
-savedsl(state, "build/frontier-state.dslb");
-let run = system ${dsl_cli(state)} --lmcode build/frontier-state.dslb;
-assert(run.code == 0);
+
+let run = run_lmcode(state); assert(run.ok, json_stringify(run));
+assert(run.ok);
 
 assert(read_file(".lmfiles-local/frontier/data.dat")=="fetched 20\npublished 14\npending 6\n");
 let plot = _lmcode_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
@@ -26,6 +26,6 @@ plot.png("images/frontier.png", 820, 520);
 plot.cmd("set title 'Lifecycle frontier'; set ylabel 'items'; set style data histograms; set style fill solid 0.8; set datafile separator ' '; set yrange [0:*]; plot '.lmfiles-local/frontier/data.dat' using 2:xtic(1) title 'registry count'");
 plot.close();
 end _lmcode_
-savedsl(plot, "build/frontier-plot.dslb");
-let plotted = system ${dsl_cli(plot)} --lmcode build/frontier-plot.dslb;
-assert(plotted.code == 0);
+
+let plotted = run_lmcode(plot); assert(plotted.ok, json_stringify(plotted));
+assert(plotted.ok);

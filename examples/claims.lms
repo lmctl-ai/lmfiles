@@ -1,7 +1,7 @@
 # Synthetic worker claims: ten pending records divided 3 + 3 + 4.
 mkdir(".lmfiles-local"); mkdir(".lmfiles-local/claims"); mkdir("images"); mkdir("build");
 if (file_exists(".lmfiles-local/claims/state.mv")) { remove_file(".lmfiles-local/claims/state.mv"); }
-let state = _lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@latest";
+let state = _lmcode_ cli="lmfiles" install="github:lmctl-ai/lmfiles@v0.1.3";
 let db = registry.open(".lmfiles-local/claims/state.mv", "claims", "{}");
 for (i in range(0, 10)) {
   db.item_upsert("{\"id\":\"claim-" + str(i) + "\"}", "{\"source\":\"synthetic\"}");
@@ -15,9 +15,9 @@ let ac = a.rows(100, 1048576).len(); let bc = b.rows(100, 1048576).len(); let cc
 file_write(".lmfiles-local/claims/data.dat", "worker-a " + str(ac) + "\nworker-b " + str(bc) + "\nremainder " + str(cc) + "\n");
 db.close();
 end _lmcode_
-savedsl(state, "build/claims-state.dslb");
-let run = system ${dsl_cli(state)} --lmcode build/claims-state.dslb;
-assert(run.code == 0);
+
+let run = run_lmcode(state); assert(run.ok, json_stringify(run));
+assert(run.ok);
 
 assert(read_file(".lmfiles-local/claims/data.dat")=="worker-a 3\nworker-b 3\nremainder 4\n");
 let plot = _lmcode_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
@@ -25,6 +25,6 @@ plot.png("images/claims.png", 820, 520);
 plot.cmd("set title 'Claimed lifecycle work'; set ylabel 'items'; set style data histograms; set style fill solid 0.8; set datafile separator ' '; set yrange [0:*]; plot '.lmfiles-local/claims/data.dat' using 2:xtic(1) title 'claims'");
 plot.close();
 end _lmcode_
-savedsl(plot, "build/claims-plot.dslb");
-let plotted = system ${dsl_cli(plot)} --lmcode build/claims-plot.dslb;
-assert(plotted.code == 0);
+
+let plotted = run_lmcode(plot); assert(plotted.ok, json_stringify(plotted));
+assert(plotted.ok);
