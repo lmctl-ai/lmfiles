@@ -1,0 +1,27 @@
+{
+  "alias": {
+    "status": "ok"
+  },
+  "doctor": {
+    "alias_families": "0",
+    "events": "0",
+    "examined": "0",
+    "format": "3",
+    "items": "0",
+    "status": "ok",
+    "storage": "MVStore positional I/O, compressed CRC32C binary records"
+  },
+  "observe": {
+    "revision": "2",
+    "status": "ok"
+  },
+  "stage": {
+    "event": "2",
+    "status": "ok"
+  },
+  "upsert": {
+    "item": "1",
+    "revision": "1",
+    "status": "ok"
+  }
+}

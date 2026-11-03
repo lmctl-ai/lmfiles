@@ -1,6 +1,7 @@
 package ai.lmctl.lmfiles;
 
 import io.lmctl.lmcode.*;
+import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
 
@@ -11,6 +12,7 @@ public final class DslHost implements AutoCloseable {
   private final List<Store> stores=new ArrayList<>();
   public DslHost(){
     context.memoryLimitBytes=Main.memoryBudget();
+    context.instructionLimit=Long.MAX_VALUE;
     for(HostApi.Binding b:HostApi.BINDINGS){
       Registry.Callback cb=(ctx,self,args)->{try{Value result=call(b,ctx,self,args);if(result.kind()==Value.Kind.STR)ctx.charge(result.asString().toString().length()*2L+32L);else if(result.kind()==Value.Kind.OBJ)ctx.charge(64);return result;}catch(VmException e){throw e;}catch(Exception e){throw VmException.host("registry: "+e.getMessage());}};
       if(b.type()==null)vm.function(b.name(),b.parameters(),b.returns(),cb); else vm.method(b.type(),b.name(),b.parameters(),b.returns(),cb);
@@ -56,7 +58,8 @@ public final class DslHost implements AutoCloseable {
   }
   private static String[] vals(Value[] a){String[] out=new String[a.length];for(int i=0;i<a.length;i++)out[i]=a[i].kind()==Value.Kind.INT?Long.toString(a[i].asInt()):a[i].kind()==Value.Kind.BOOL?Boolean.toString(a[i].asBool()):str(a[i]);return out;}
   private Value text(String value){long bytes=value==null?0:value.length()*2L+32;context.charge(bytes);return Value.ofString(value==null?"":value);}
-  public int run(Path bytecode,boolean dry)throws Exception{context.resetBudget();long max=Main.memoryBudget();long size=Files.size(bytecode);if(size>Math.min(max/4,64L*1024*1024))throw VmException.badBytecode("bytecode exceeds LMFILES_MAX_MEMORY_MB budget");Program p=Program.load(Files.readAllBytes(bytecode),HostApi.schemaBytes(),vm);if(dry)return Reports.ok("{\"dry_run\":true}");try{p.run(context,vm);return Reports.ok("null");}catch(VmException e){if(e.getMessage().toLowerCase(java.util.Locale.ROOT).contains("memory"))System.err.println("lmfiles: LMFILES_MAX_MEMORY_MB memory budget exceeded");return Reports.error("run",e);}}
+  public Program load(Path bytecode)throws IOException{return Program.load(Files.readAllBytes(bytecode),HostApi.schemaBytes(),vm);}
+  public void execute(Program program,boolean dry){context.resetBudget();context.setDry(dry);program.run(context,vm);}
   public Registry registry(){return vm;}
   public void close(){for(Store s:List.copyOf(stores))try{s.close();}catch(RuntimeException ignored){}stores.clear();}
 }

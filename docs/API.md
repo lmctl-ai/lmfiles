@@ -28,8 +28,9 @@ values (1..Long.MAX_VALUE) within this local DB; do not mix IDs between DBs. Met
 | apply_records(plan,results,options) | Plan-validated journal replay with durable result-ID dedup |
 
 Cursor.next_json(max_rows,max_bytes) returns an array JSON string; rows1..4096,
-bytes <=16 MiB and <=a quarter of the configured budget. A too-large row is an
-explicit error, never an empty page. rows() uses one reusable Rows buffer;
+and `max_bytes` is the caller-selected page target (minimum 2 bytes), without a
+host-imposed upper response ceiling. A too-large row is an explicit error,
+never an empty page. rows() uses one reusable Rows buffer;
 json_at(index), len(), clear() avoid per-item handles. write_jsonl streams to a
 local file. Close cursors/snapshots/registries when done.
 

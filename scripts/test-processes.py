@@ -167,7 +167,8 @@ def main() -> int:
             maps=Path(f'/proc/{holder.pid}/maps')
             if maps.is_file():assert str(holder_db) not in maps.read_text(), 'registry DB was memory-mapped' 
             busy = call("--request", str(holder_db), "doctor", check=False)
-            assert busy.returncode != 0 and ("writer-busy" in busy.stderr or "lock" in busy.stderr), busy.stderr
+            assert busy.returncode == 3, (busy.returncode, busy.stdout, busy.stderr)
+            assert '"ok":false' in busy.stdout and ("writer-busy" in busy.stdout or "lock" in busy.stdout), busy.stdout
             passed += 1
         finally:
             if holder.poll() is None:holder.terminate()

@@ -306,10 +306,10 @@ public final class Store implements AutoCloseable {
         private final Iterator<?> source;private final AutoCloseable owner;private Object pending;private boolean ended;private Rows reusable;
         Cursor(Iterator<?> source,AutoCloseable owner){this.source=source;this.owner=owner;}
         public String nextJson(int maxRows,int maxBytes){
-            if(ended)throw new IllegalStateException("cursor-closed");if(maxRows<1||maxRows>4096||maxBytes<2||maxBytes>Math.min(MAX_BATCH,Main.memoryBudget()/4))throw new IllegalArgumentException("invalid-cursor-budget LMFILES_MAX_MEMORY_MB");
+            if(ended)throw new IllegalStateException("cursor-closed");if(maxRows<1||maxRows>4096||maxBytes<2)throw new IllegalArgumentException("invalid-cursor-budget");
             StringBuilder out=new StringBuilder("[");int count=0,used=2;
             while(count<maxRows&&(pending!=null||source.hasNext())){if(pending==null)pending=source.next();String encoded=json(pending);int bytes=encoded.getBytes(StandardCharsets.UTF_8).length+(count==0?0:1);
-                if(used+bytes>maxBytes){if(count==0)throw new IllegalArgumentException("row-exceeds-cursor-byte-budget");break;}
+                if((long)used+bytes>maxBytes){if(count==0)throw new IllegalArgumentException("row-exceeds-cursor-byte-budget");break;}
                 if(count++>0)out.append(',');out.append(encoded);used+=bytes;pending=null;
             }
             return out.append(']').toString();
