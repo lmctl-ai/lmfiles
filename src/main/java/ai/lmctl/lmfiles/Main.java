@@ -40,7 +40,11 @@ public final class Main {
       System.out.write(HostApi.schemaBytes());return 0;
     }
     if(args.length==1&&args[0].equals("--lmcode-signatures")){
-      try(DslHost host=new DslHost()){host.registry().signatures().stream().sorted().forEach(System.out::println);}return 0;
+      try(DslHost host=new DslHost()){
+        String signatures=String.join("\n",host.registry().signatures().stream().sorted().toList())+"\n";
+        System.out.write(signatures.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+      }
+      return 0;
     }
     if(args.length==1&&args[0].equals("--self-test")){System.out.println(J.str(Map.of("ok",true,"assertions",CoreChecks.run(Files.createTempDirectory("lmfiles-selftest-")))));return 0;}
     if(args.length==2&&args[0].equals("--self-test")){System.out.println(J.str(Map.of("ok",true,"assertions",CoreChecks.run(Path.of(args[1])))));return 0;}
