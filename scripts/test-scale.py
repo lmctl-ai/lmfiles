@@ -43,7 +43,7 @@ def directory_bytes(path: Path) -> int:
             try:
                 stat = item.stat(follow_symlinks=False)
                 logical += stat.st_size
-                allocated += int(stat.st_blocks) * 512
+                allocated += int(getattr(stat, "st_blocks", 0)) * 512
             except FileNotFoundError:
                 continue
     return max(logical, allocated)
@@ -118,6 +118,7 @@ class ManagedChild:
         self.phase: str | None = None
         self.count: int | None = None
         self._kill_ready = False
+        self._killed = False
         self.worker_result = None
         self._log_bytes = 0
         self._log_limit = 8 * 1024 * 1024
@@ -126,13 +127,24 @@ class ManagedChild:
         proc = self._proc
         if proc and proc.poll() is None:
             try:
-                os.killpg(proc.pid, signal.SIGKILL)
-            except (ProcessLookupError, PermissionError):
-                proc.kill()
+                if os.name == "nt":
+                    proc.kill()
+                elif os.getpgid(proc.pid) == proc.pid:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                else:
+                    proc.kill()
+            except ProcessLookupError:
+                pass
+            except PermissionError:
+                try:
+                    proc.kill()
+                except ProcessLookupError:
+                    pass
             try:
                 proc.wait(timeout=5)
             except subprocess.TimeoutExpired:
-                raise RuntimeError("child group did not terminate after SIGKILL")
+                raise RuntimeError("owned child did not terminate after kill")
+            self._killed = proc.returncode is not None and proc.returncode != 0
 
     def _monitor(self, phase: str) -> None:
         deadline = time.monotonic() + self.timeout
@@ -204,7 +216,7 @@ class ManagedChild:
                 raise self._violation
             if phase == "crash":
                 marker = self.work / ".lmfiles-scale-marker"
-                if not self._kill_ready or code != -signal.SIGKILL or (not marker.is_file() or marker.is_symlink()):
+                if not self._kill_ready or not self._killed or code == 0 or (not marker.is_file() or marker.is_symlink()):
                     raise PhaseFailure("crash kill protocol failed", {"phase": phase, "count": count,
                         "returncode": code, "stdout": records, "guard_readings": self.readings})
                 return {"phase": phase, "count": count, "returncode": code, "status": "ok",

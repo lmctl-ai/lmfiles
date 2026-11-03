@@ -3,6 +3,7 @@
 from __future__ import annotations
 import importlib.util
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -201,7 +202,10 @@ class ScaleGuardTests(unittest.TestCase):
             guard = scale.DiskGuard(work, read_usage=lambda: (scale.HARD_MIN_FREE, 0))
             run = scale.ManagedChild([sys.executable, str(child)], work, guard, timeout=5, sample_seconds=.01)
             result = run.run("crash", 1)
-            self.assertEqual(result["returncode"], -9)
+            self.assertTrue(run._killed)
+            self.assertNotEqual(result["returncode"], 0)
+            if os.name != "nt":
+                self.assertEqual(result["returncode"], -9)
             self.assertEqual(result["status"], "ok")
 
     def test_monitor_runtime_error_fails_closed(self):
