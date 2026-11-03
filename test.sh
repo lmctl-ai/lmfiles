@@ -113,7 +113,7 @@ from pathlib import Path
 work=Path(sys.argv[1]);schema=str((Path.cwd()/'schema/lmfiles.dsl.json').resolve());host=json.loads(sys.argv[2])
 def restricted(name, amount):
  path=work/name
- path.write_text('import os,sys\n'+f'host={host!r}\n'+f"env=os.environ.copy();env['LMFILES_MAX_MEMORY_MB']='{amount}'\nos.execvpe(host[0],host+sys.argv[1:],env)\n",encoding='utf-8');path.chmod(0o755);return [sys.executable,str(path)]
+ path.write_text('import os,sys,subprocess\n'+f'host={host!r}\n'+f"env=os.environ.copy();env['LMFILES_MAX_MEMORY_MB']='{amount}'\nresult=subprocess.run(host+sys.argv[1:],env=env);raise SystemExit(result.returncode)\n",encoding='utf-8');path.chmod(0o755);return [sys.executable,str(path)]
 command=json.dumps(restricted('memory-host-1.py',1)+['--lmcode','$DSLFILE'])
 program=('let p = _lmcode_ schema='+json.dumps(schema)+';\nlet values = str_list();\nfor (i in range(0,10000)) { values.add("'+'x'*128+'"); }\nend _lmcode_\n'
          'let result=run_lmcode(p,{command:'+command+'});write_json('+json.dumps(str(work/'memory.json'))+',result);\n')
@@ -144,7 +144,7 @@ python3 - "$fixture" "$host_json" <<'PYCACHES'
 import json,sys
 from pathlib import Path
 work=Path(sys.argv[1]);schema=str((Path.cwd()/'schema/lmfiles.dsl.json').resolve());host=json.loads(sys.argv[2])
-wrapper=work/'memory-host-2.py';wrapper.write_text('import os,sys\n'+f'host={host!r}\n'+'env=os.environ.copy();env[\'LMFILES_MAX_MEMORY_MB\']=\'2\';os.execvpe(host[0],host+sys.argv[1:],env)\n',encoding='utf-8');wrapper.chmod(0o755)
+wrapper=work/'memory-host-2.py';wrapper.write_text('import os,sys,subprocess\n'+f'host={host!r}\n'+'env=os.environ.copy();env[\'LMFILES_MAX_MEMORY_MB\']=\'2\';result=subprocess.run(host+sys.argv[1:],env=env);raise SystemExit(result.returncode)\n',encoding='utf-8');wrapper.chmod(0o755)
 command=json.dumps([sys.executable,str(wrapper),'--lmcode','$DSLFILE'])
 program='let p = _lmcode_ schema='+json.dumps(schema)+';\n'
 for name in ['a','b']:
