@@ -9,7 +9,17 @@ import sys
 import tempfile
 
 host = json.loads(sys.argv[1])
-compiler = os.environ.get("LMSCRIPT_BIN") or shutil.which("lmscript.cmd" if os.name == "nt" else "lmscript") or "lmscript"
+compiler_path = os.environ.get("LMSCRIPT_BIN")
+if os.name == "nt":
+    shim = compiler_path or shutil.which("lmscript.cmd") or shutil.which("lmscript")
+    node = shutil.which("node")
+    if shim and node:
+        entry = Path(shim).resolve().parent.parent / "@lmctl-ai" / "lmctl" / "bin" / "lmscript"
+        compiler = [node, str(entry)] if entry.is_file() else [shim]
+    else:
+        compiler = [shim or "lmscript"]
+else:
+    compiler = [compiler_path or shutil.which("lmscript") or "lmscript"]
 schema = str((Path.cwd() / "schema/lmfiles.dsl.json").resolve())
 fixture = Path("tests/protocol-parity-old.json")
 identity = '{"id":"same-input"}'
@@ -38,7 +48,7 @@ with tempfile.TemporaryDirectory(prefix="lmfiles-parity-") as tmp:
         'end _lmcode_\n'
         f'let result=run_lmcode(p,{{command:{host_command}}}); assert(result.ok,json_stringify(result));\n'
         f'write_json({json.dumps(str(root / "new.json"))},result.result);\n', encoding="utf-8")
-    result = subprocess.run([compiler, str(source)], capture_output=True, text=True)
+    result = subprocess.run([*compiler, str(source)], capture_output=True, text=True)
     assert result.returncode == 0, (result.returncode, result.stdout, result.stderr)
     current = json.loads((root / "new.json").read_text(encoding="utf-8"))
     current = {key: json.loads(value) if isinstance(value, str) else value for key, value in current.items()}
