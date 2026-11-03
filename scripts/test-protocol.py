@@ -10,7 +10,17 @@ import tempfile
 
 host = sys.argv[1:]
 assert host, "host command is required"
-compiler = os.environ.get("LMSCRIPT_BIN") or shutil.which("lmscript.cmd" if os.name == "nt" else "lmscript") or "lmscript"
+compiler_path = os.environ.get("LMSCRIPT_BIN")
+if os.name == "nt":
+    shim = compiler_path or shutil.which("lmscript.cmd") or shutil.which("lmscript")
+    node = shutil.which("node")
+    if shim and node:
+        entry = Path(shim).resolve().parent.parent / "@lmctl-ai" / "lmctl" / "bin" / "lmscript"
+        compiler = [node, str(entry)] if entry.is_file() else [shim]
+    else:
+        compiler = [shim or "lmscript"]
+else:
+    compiler = [compiler_path or shutil.which("lmscript") or "lmscript"]
 
 with tempfile.TemporaryDirectory(prefix="lmfiles-protocol-") as tmp:
     root = Path(tmp)
@@ -39,7 +49,6 @@ with tempfile.TemporaryDirectory(prefix="lmfiles-protocol-") as tmp:
         assert result.returncode == 2, (flag, result.returncode, result.stdout, result.stderr)
         assert not missing.exists(), (flag, "retired option reached file input")
 
-    compiler = os.environ.get("LMSCRIPT_BIN", "lmscript")
     schema = Path("schema/lmfiles.dsl.json").resolve()
     host_argv = json.dumps(host)
     wrapper = root / "host-wrapper.py"
@@ -105,13 +114,13 @@ with tempfile.TemporaryDirectory(prefix="lmfiles-protocol-") as tmp:
         'println("PASS lmcode single and builder invocations");\n', encoding="utf-8")
 
     dry_env = dict(os.environ, LMFILES_TEST_SET_DRY="1", LMFILES_MAX_MEMORY_MB="256")
-    result = subprocess.run([compiler, str(source)], env=dry_env, capture_output=True, text=True)
+    result = subprocess.run([*compiler, str(source)], env=dry_env, capture_output=True, text=True)
     assert result.returncode == 0 and "PASS lmcode single and builder invocations" in result.stdout, (result.returncode, result.stdout, result.stderr)
     assert not first.exists() and not second.exists() and not first_db.exists() and not second_db.exists(), "dry invocation called an effectful file or registry callback"
     dry_records = [json.loads(line) for line in (root / "dry-proof.jsonl").read_text(encoding="utf-8").splitlines()]
     assert len(dry_records) == 2 and all(record.get("dry") is True for record in dry_records), dry_records
 
-    result = subprocess.run([compiler, str(source)], env=dict(os.environ, LMFILES_MAX_MEMORY_MB="256"),
+    result = subprocess.run([*compiler, str(source)], env=dict(os.environ, LMFILES_MAX_MEMORY_MB="256"),
                             capture_output=True, text=True)
     assert result.returncode == 0 and "PASS lmcode single and builder invocations" in result.stdout, (result.returncode, result.stdout, result.stderr)
     assert first.read_text(encoding="utf-8") == "first" and second.read_text(encoding="utf-8") == "second"
