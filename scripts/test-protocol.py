@@ -3,13 +3,14 @@
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
 
 host = sys.argv[1:]
 assert host, "host command is required"
-compiler = os.environ.get("LMSCRIPT_BIN", "lmscript")
+compiler = os.environ.get("LMSCRIPT_BIN") or shutil.which("lmscript.cmd" if os.name == "nt" else "lmscript") or "lmscript"
 
 with tempfile.TemporaryDirectory(prefix="lmfiles-protocol-") as tmp:
     root = Path(tmp)

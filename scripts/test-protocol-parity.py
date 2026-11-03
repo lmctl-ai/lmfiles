@@ -3,12 +3,13 @@
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
 
 host = json.loads(sys.argv[1])
-compiler = os.environ.get("LMSCRIPT_BIN", "lmscript")
+compiler = os.environ.get("LMSCRIPT_BIN") or shutil.which("lmscript.cmd" if os.name == "nt" else "lmscript") or "lmscript"
 schema = str((Path.cwd() / "schema/lmfiles.dsl.json").resolve())
 fixture = Path("tests/protocol-parity-old.json")
 identity = '{"id":"same-input"}'
