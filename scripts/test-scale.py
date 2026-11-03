@@ -102,7 +102,7 @@ class PhaseFailure(RuntimeError):
 
 
 class ManagedChild:
-    """Run one phase, streaming bounded stdout JSONL and killing its group."""
+    """Run one phase, stream bounded JSONL, and stop its owned child safely."""
 
     def __init__(self, command: list[str], work: Path, guard: DiskGuard, *, timeout: float,
                  stdout_log: Path | None = None, sample_seconds: float = .5):

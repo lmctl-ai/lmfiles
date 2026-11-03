@@ -34,6 +34,7 @@ class ScaleGuardTests(unittest.TestCase):
             self.assertTrue(result['cleanup_verified'])
             self.assertFalse(any(p.get('status')=='ok' for p in result['phases']))
 
+    @unittest.skipIf(os.name == "nt", "the reserved E mount is a POSIX-specific safety boundary")
     def test_reports_cannot_write_outside_fixture_on_e(self):
         for flag in ('--report','--progress-log'):
             with self.subTest(flag=flag), redirect_stdout(StringIO()), mock.patch('sys.stderr',new=StringIO()):
@@ -92,13 +93,17 @@ class ScaleGuardTests(unittest.TestCase):
 
     def test_relative_executable_resolves_before_fixture_cwd(self):
         with tempfile.TemporaryDirectory() as directory:
-            base=Path(directory);program=base/"tool";program.write_text("#!/bin/sh\nexit 0\n");program.chmod(0o755)
-            import os
+            base=Path(directory);executable="./tool";program=base/"tool"
+            if os.name == "nt":
+                executable="./tool.cmd";program=base/"tool.cmd";program.write_text("@echo off\r\nexit /b 0\r\n")
+            else:
+                program.write_text("#!/bin/sh\nexit 0\n");program.chmod(0o755)
             previous=Path.cwd()
             try:
                 os.chdir(base)
-                resolved=scale.resolve_command(["./tool"],base)
-            finally:os.chdir(previous)
+                resolved=scale.resolve_command([executable],base)
+            finally:
+                os.chdir(previous)
             self.assertEqual(resolved[0],str(program.resolve()))
 
     def test_low_free_is_rejected(self):
@@ -133,7 +138,7 @@ class ScaleGuardTests(unittest.TestCase):
             self.assertEqual(json.loads(log.read_text().splitlines()[-1])["event"], "result")
             self.assertTrue(any(r["event"] == "before" for r in run.readings))
 
-    def test_violation_kills_process_group(self):
+    def test_violation_terminates_owned_child(self):
         with tempfile.TemporaryDirectory(prefix="lmfiles-scale-test-") as td:
             work = Path(td) / "work"; work.mkdir()
             child = Path(td) / "child.py"
@@ -155,6 +160,7 @@ class ScaleGuardTests(unittest.TestCase):
             shutil.rmtree(work, ignore_errors=True)
         self.assertFalse(work.exists())
 
+    @unittest.skipIf(os.name == "nt", "sparse allocation and symlink accounting are filesystem-specific")
     def test_sparse_file_counts_logical_size_and_ignores_symlink(self):
         with tempfile.TemporaryDirectory(prefix="lmfiles-scale-test-") as td:
             work = Path(td)
@@ -292,4 +298,4 @@ class ScaleGuardTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    unittest.main(verbosity=2)
