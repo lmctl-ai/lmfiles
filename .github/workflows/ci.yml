@@ -71,6 +71,10 @@ jobs:
           if [ -f target/lmfiles.exe ]; then exe=target/lmfiles.exe; suffix=.exe; fi
           test -f "$exe"
           cp "$exe" "dist/lmfiles-${{ matrix.name }}$suffix"
+      - name: Verify executable is native (not bytecode)
+        run: |
+          python3 scripts/verify-native-executable.py --self-test
+          python3 scripts/verify-native-executable.py dist/*
       - name: Upload tested executable
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
@@ -93,6 +97,10 @@ jobs:
         with:
           path: dist
           merge-multiple: true
+      - name: Verify published executables are native (not bytecode)
+        run: |
+          python3 scripts/verify-native-executable.py --self-test
+          python3 scripts/verify-native-executable.py dist/lmfiles-*
       - name: Publish the five tested binaries from this green main commit
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
